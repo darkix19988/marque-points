@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Marque-points</title>
+  <meta name="description" content="Comptez les points de vos jeux de société, sans calcul ni feuille de score.">
+  <meta name="theme-color" content="#0e1420">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/img/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <style>
+    .hero { padding: 48px 0 28px; }
+    .hero .logo { font-size: 44px; line-height: 1; }
+    .hero h1 { font-size: 34px; margin-top: 14px; }
+    .hero p { margin-top: 8px; font-size: 17px; }
+    .games { display: grid; gap: 14px; padding-bottom: 48px; }
+    .game {
+      display: flex; gap: 16px; align-items: center; text-decoration: none;
+      padding: 18px; border-radius: var(--radius); background: var(--surface);
+      border: 1px solid var(--line); box-shadow: var(--shadow); transition: transform .1s;
+    }
+    .game:active { transform: scale(.99); }
+    .game .art {
+      width: 64px; height: 64px; flex: none; border-radius: 14px; display: grid; place-items: center;
+      font-size: 34px; background: #121a2a; color: #f2c14e;
+    }
+    .game h2 { font-size: 20px; }
+    .game .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+    .game.soon { opacity: .6; box-shadow: none; pointer-events: none; }
+    .game.soon .art { background: var(--surface-2); color: var(--ink-3); }
+    .go { margin-left: auto; font-size: 22px; color: var(--ink-3); }
+    .resume { display: inline-block; margin-top: 6px; font-size: 13px; color: var(--accent); font-weight: 600; }
+    footer { padding: 0 0 32px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <div class="logo" aria-hidden="true">🎲</div>
+      <h1>Marque-points</h1>
+      <p class="muted">Choisissez un jeu, entrez les annonces et les résultats : le site applique les règles et fait les calculs.</p>
+    </header>
+
+    <section class="games" aria-label="Jeux">
+      <a class="game" href="skull-king/">
+        <div class="art" aria-hidden="true">☠️</div>
+        <div>
+          <h2>Skull King</h2>
+          <p class="muted small">Jeu de plis et de paris pirates, de 2 à 8 joueurs.</p>
+          <div class="tags">
+            <span class="tag">Règles officielles</span>
+            <span class="tag">Rascal</span>
+            <span class="tag">Kraken, Baleine, Butin</span>
+            <span class="tag">Expansion Pack</span>
+            <span class="tag">Ancienne édition</span>
+          </div>
+          <span class="resume" id="sk-resume" hidden>Une partie est en cours, touchez pour reprendre</span>
+        </div>
+        <span class="go" aria-hidden="true">›</span>
+      </a>
+      <div class="game soon" aria-disabled="true">
+        <div class="art" aria-hidden="true">＋</div>
+        <div>
+          <h2>D’autres jeux arrivent</h2>
+          <p class="muted small">Skull King est le premier jeu disponible.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="muted tiny">Les parties sont enregistrées sur cet appareil, rien n’est envoyé en ligne.</footer>
+  <script>
+    try {
+      const sk = JSON.parse(localStorage.getItem('marque-points:skull-king:v1') || 'null');
+      if (sk && sk.current && !sk.current.finished) document.getElementById('sk-resume').hidden = false;
+    } catch (e) { /* stockage indisponible */ }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  </script>
+</body>
+</html>
