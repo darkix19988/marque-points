@@ -30,6 +30,8 @@ sw.js                 cache hors ligne
 tests/                tests du décompte (node --test tests/)
 ```
 
+À chaque mise à jour de `app.js` ou `rules.js`, incrémenter le `?v=` dans `skull-king/index.html` et dans l'import de `app.js` (et `CACHE` dans `sw.js`) : les deux fichiers sont ainsi toujours chargés dans la même version.
+
 Pour ajouter un jeu : créer un dossier `nom-du-jeu/` sur le modèle de `skull-king/`, puis l'ajouter à `index.html` et à la liste `SHELL` de `sw.js`.
 
 ## Développement

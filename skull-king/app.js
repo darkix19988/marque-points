@@ -1,5 +1,6 @@
 // Skull King — interface du compteur de points
-import * as R from './rules.js';
+// Le numéro de version force le chargement de app.js et rules.js ensemble après une mise à jour.
+import * as R from './rules.js?v=4';
 
 const KEY = 'marque-points:skull-king:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
@@ -22,7 +23,7 @@ function ensureDefaults(g) {
   const ids = g.players.map((p) => p.id);
   g.rounds.forEach((r) => { if (!r.done) R.fillDefaults(r, ids); });
 }
-ensureDefaults(db.current);
+try { ensureDefaults(db.current); } catch (err) { console.error(err); }
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
@@ -764,6 +765,22 @@ function viewModal() {
 
 // ---------- Rendu ----------
 function render() {
+  try {
+    renderScreen();
+  } catch (err) {
+    // Ne jamais laisser l'écran figé : on explique et on propose de recharger (la partie est sauvegardée).
+    console.error(err);
+    ui.modal = null;
+    $app.innerHTML = `<main class="page no-bar"><div class="wrap stack" style="padding-top:40px">
+      <div class="card stack"><h2>Oups, l’affichage a planté</h2>
+      <p class="muted">Souvent juste après une mise à jour du site. Votre partie est sauvegardée : rechargez la page.</p>
+      <button class="btn btn-primary btn-lg" onclick="location.reload()">Recharger</button>
+      ${db.current ? '<button class="btn btn-ghost btn-danger" data-act="resetCurrent">Toujours bloqué ? Abandonner la partie en cours</button>' : ''}
+      <p class="tiny muted">${esc(err && err.message)}</p></div></div></main>`;
+  }
+}
+
+function renderScreen() {
   let html;
   switch (ui.screen) {
     case 'setup': html = viewSetup(); break;
@@ -830,6 +847,12 @@ const actions = {
   backdrop: (d, el, e) => { if (e.target === el) { ui.modal = null; render(); } },
   askAbandon: () => { ui.modal = { type: 'confirm', title: 'Abandonner la partie ?', text: 'Les scores de cette partie seront effacés.', ok: 'abandon', okLabel: 'Abandonner' }; render(); },
   abandon: () => { db.current = null; save(); go('home'); },
+  resetCurrent: () => {
+    if (!confirm('Abandonner la partie en cours ? Ses scores seront effacés.')) return;
+    db.current = null;
+    save();
+    go('home');
+  },
   askEndEarly: () => {
     const done = db.current.rounds.filter((r) => r.done).length;
     ui.modal = { type: 'confirm', title: 'Terminer la partie maintenant ?', text: `Le classement final sera calculé sur ${plural(done, 'manche jouée', 'manches jouées')}. La manche en cours, si elle n’est pas validée, ne compte pas.`, ok: 'endEarly', okLabel: 'Terminer' };
