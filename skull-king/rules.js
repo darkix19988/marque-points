@@ -66,9 +66,9 @@ export function maxPlayers(c) {
   return c.pack ? 12 : EDITIONS.new.maxPlayers;
 }
 
-/** À 2 joueurs, on distribue une 3e main au fantôme de Barbe-Grise. */
-export function handsDealt(nPlayers) {
-  return nPlayers === 2 ? 3 : nPlayers;
+/** Édition actuelle à 2 joueurs : une 3e main pour le fantôme de Barbe-Grise. */
+export function handsDealt(nPlayers, c) {
+  return nPlayers === 2 && (!c || c.edition !== 'old') ? 3 : nPlayers;
 }
 
 export function deckSize(c, nPlayers) {
@@ -92,7 +92,7 @@ export function deckSize(c, nPlayers) {
 }
 
 export function maxCardsPerHand(c, nPlayers) {
-  return Math.floor(deckSize(c, nPlayers) / handsDealt(nPlayers));
+  return Math.floor(deckSize(c, nPlayers) / handsDealt(nPlayers, c));
 }
 
 export function scheduleRounds(c) {
@@ -140,12 +140,12 @@ export function bonusDefs(c) {
       {
         key: 'pirates', icon: '💀', pts: 30, total: 6, exclusive: true,
         label: 'Pirate capturé par le Skull King',
-        hint: 'Chaque pirate dans le pli remporté avec le Skull King. La Scary Mary compte toujours, même jouée en Escape.',
+        hint: 'Dans le pli gagné par le Skull King. La Scary Mary compte toujours, même jouée en Escape.',
       },
       {
         key: 'sk', icon: '🧜‍♀️', pts: 50, total: 1, exclusive: true,
         label: 'Skull King capturé par la Sirène',
-        hint: 'Pli remporté avec la Sirène contenant le Skull King.',
+        hint: 'Le Skull King dans le pli gagné par la Sirène.',
       },
     ];
   }
@@ -155,28 +155,28 @@ export function bonusDefs(c) {
     {
       key: 'c14', icon: '🎴', pts: 10, total: 3,
       label: '14 de couleur',
-      hint: 'Jaune, violet ou vert, dans vos plis à la fin de la manche, peu importe qui l’a joué.',
+      hint: 'Jaune, violet ou vert, dans vos plis, peu importe qui l’a joué.',
     },
     {
       key: 'b14', icon: '🏴', pts: 20, total: 1,
       label: '14 noir (Jolly Roger)',
-      hint: 'Dans vos plis à la fin de la manche.',
+      hint: 'Dans vos plis, peu importe qui l’a joué.',
     },
     {
       key: 'mermaid', icon: '🧜‍♀️', pts: 20, total: 2,
       label: 'Sirène capturée par un Pirate',
-      hint: 'Pli remporté avec un Pirate (ou la Tigresse jouée en Pirate) contenant une Sirène.',
+      hint: 'Dans un pli gagné par un Pirate (ou la Tigresse jouée en Pirate).',
     },
     {
       key: 'pirates', icon: '☠️', pts: 30, total: piratesInDeck, exclusive: true,
       label: 'Pirate capturé par le Skull King',
-      hint: 'Pli remporté avec le Skull King. La Tigresse ne compte que si elle a été jouée en Pirate.'
+      hint: 'Dans le pli gagné par le Skull King. La Tigresse compte seulement si elle a été jouée en Pirate.'
         + (plank ? ' Un pirate retiré par La Planche ne compte pas.' : ''),
     },
     {
       key: 'sk', icon: '👑', pts: 40, total: 1, exclusive: true,
       label: 'Skull King capturé par une Sirène',
-      hint: 'Pli remporté avec une Sirène contenant le Skull King.',
+      hint: 'Le Skull King dans le pli gagné par une Sirène.',
     },
   ];
   if (c.pack) {
@@ -191,12 +191,12 @@ export function bonusDefs(c) {
       {
         key: 'e8', icon: '🧭', pts: 5, total: 4,
         label: '8 de l’extension',
-        hint: 'Les 8 marqués d’une boussole, dans vos plis.',
+        hint: 'Les 8 marqués d’une boussole.',
       },
       {
         key: 'e7', icon: '🧭', pts: -5, total: 4,
         label: '7 de l’extension',
-        hint: 'Les 7 marqués d’une boussole, dans vos plis (malus).',
+        hint: 'Les 7 marqués d’une boussole (malus).',
       },
     );
     const monsters = (c.kraken ? 1 : 0) + (c.whale ? 1 : 0) + (c.packStingray ? 1 : 0);
@@ -204,7 +204,7 @@ export function bonusDefs(c) {
       defs.push({
         key: 'davy', icon: '⚓', pts: 20, total: monsters, exclusive: true, noTrick: true,
         label: 'Monstre marin pris par Davy Jones',
-        hint: 'Pour le joueur du Coffre de Davy Jones : chaque Kraken, Baleine ou Raie détruit, peu importe l’ordre.',
+        hint: 'Pour qui a joué le Coffre : chaque Kraken, Baleine ou Raie détruit. Possible sans gagner de pli.',
       });
     }
   }
@@ -226,6 +226,36 @@ export function newRound(cards) {
 }
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/** Annonces et plis à 0 par défaut : on ne touche que les joueurs qui ne sont pas à zéro. */
+export function fillDefaults(round, playerIds) {
+  for (const id of playerIds) {
+    if (round.bids[id] == null) round.bids[id] = 0;
+    if (round.tricks[id] == null) round.tricks[id] = 0;
+  }
+  round.loots = round.loots || [];
+  round.modes = round.modes || {};
+  round.bonus = round.bonus || {};
+  return round;
+}
+
+/**
+ * Pourquoi un joueur ne peut pas ajouter un bonus de plus (null s'il le peut).
+ * Ne compte que les joueurs qui touchent des bonus cette manche.
+ */
+export function bonusLimit(c, round, players, def, pid) {
+  let total = 0;
+  let holder = null;
+  for (const p of players) {
+    if (bonusFactor(c, round, p.id) === 0) continue;
+    const n = (round.bonus[p.id] || {})[def.key] || 0;
+    total += n;
+    if (n > 0 && p.id !== pid && !holder) holder = p;
+  }
+  if (def.exclusive && holder) return `Déjà attribué à ${holder.name}`;
+  if (total >= def.total) return def.total === 1 ? 'Une seule carte dans le jeu' : `${def.total} cartes au maximum dans le jeu`;
+  return null;
+}
 
 /** Annonce finale d'un joueur, après un éventuel coup de Harry le Géant. */
 export function effectiveBid(c, round, pid) {

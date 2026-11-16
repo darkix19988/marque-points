@@ -1,5 +1,5 @@
 // Service worker : le site fonctionne hors ligne (réseau d'abord, cache en secours).
-const CACHE = 'marque-points-v1';
+const CACHE = 'marque-points-v2';
 const SHELL = [
   './',
   'index.html',

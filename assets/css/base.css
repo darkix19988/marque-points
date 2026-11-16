@@ -89,6 +89,10 @@ body {
 }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Pas de zoom au double tap quand on appuie vite plusieurs fois sur un bouton. */
+html, body, button, a, input, select, label { touch-action: manipulation; }
+body { overscroll-behavior-y: none; }
+button, .chip { user-select: none; -webkit-user-select: none; }
 a { color: inherit; }
 h1, h2, h3 { line-height: 1.15; margin: 0; letter-spacing: -.01em; }
 p { margin: 0; }
@@ -109,6 +113,8 @@ p { margin: 0; }
 .btn-danger { color: var(--bad); }
 .btn-block { width: 100%; }
 .btn-lg { min-height: 54px; font-size: 17px; }
+.btn-small { min-height: 34px; padding: 4px 12px; font-size: 14px; }
+.btn-compact { padding: 10px 12px; font-size: 15px; }
 .icon-btn {
   width: var(--tap); height: var(--tap); border-radius: 999px; border: 1px solid transparent;
   background: transparent; display: inline-grid; place-items: center; font-size: 20px; color: var(--ink);

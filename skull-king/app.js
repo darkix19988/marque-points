@@ -15,6 +15,13 @@ function load() {
   }
 }
 let db = load();
+/** Anciennes sauvegardes : on remplit les annonces et plis manquants avec 0. */
+function ensureDefaults(g) {
+  if (!g) return;
+  const ids = g.players.map((p) => p.id);
+  g.rounds.forEach((r) => { if (!r.done) R.fillDefaults(r, ids); });
+}
+ensureDefaults(db.current);
 function save() {
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
@@ -174,7 +181,7 @@ function viewSetup() {
         <p class="muted small">Dans l’ordre du tour de table : le joueur 1 distribue la première manche.</p>
         ${players}
         ${n < max ? '<button class="btn" data-act="addPlayer">+ Ajouter un joueur</button>' : ''}
-        ${n === 2 ? '<p class="small muted">À 2 joueurs, on distribue une 3e main au fantôme de Barbe-Grise : il joue toujours en 2e position et n’a pas de score.</p>' : ''}
+        ${n === 2 && isNew ? '<p class="small muted">À 2 joueurs, on distribue une 3e main au fantôme de Barbe-Grise : il joue toujours en 2e position et n’a pas de score.</p>' : ''}
       </div>
 
       <div class="section-title">Édition du jeu</div>
@@ -220,7 +227,7 @@ function viewSetup() {
       <div class="card summary">
         <b>${plural(rounds.length, 'manche', 'manches')} · cartes par joueur</b>
         <div class="round-strip">${rounds.map((k, i) => `<span class="${k !== sched[i] ? 'capped' : ''}">${k}</span>`).join('')}</div>
-        <p class="small muted">Paquet de ${R.deckSize(c, Math.max(2, n))} cartes${n === 2 ? ' pour 3 mains' : ''}.
+        <p class="small muted">Paquet de ${R.deckSize(c, Math.max(2, n))} cartes${n === 2 && isNew ? ' pour 3 mains' : ''}.
         ${capped ? ' Il n’y a pas assez de cartes pour tout le monde : les dernières manches répètent le nombre maximal de cartes (règle officielle).' : ''}</p>
       </div>
     </div></main>
@@ -234,7 +241,8 @@ function startGame() {
   const s = ui.setup;
   const players = s.players.map((p, i) => ({ id: p.id, name: p.name.trim() || `Joueur ${i + 1}`, color: COLORS[i % COLORS.length] }));
   const config = R.normalizeConfig(s.config);
-  const rounds = R.roundsFor(config, players.length).map((k) => R.newRound(k));
+  const ids = players.map((p) => p.id);
+  const rounds = R.roundsFor(config, players.length).map((k) => R.fillDefaults(R.newRound(k), ids));
   db.current = { id: uid(), createdAt: Date.now(), config, players, rounds, cur: 0, phase: 'bid', finished: false };
   db.lastPlayers = players.map((p) => p.name);
   db.lastConfig = config;
@@ -252,18 +260,35 @@ function topbarPlay(g) {
   return `
     <header class="topbar"><div class="wrap">
       <button class="icon-btn" data-act="home" aria-label="Accueil">‹</button>
-      <div class="title"><strong>Manche ${g.cur + 1} / ${g.rounds.length} · ${plural(r.cards, 'carte', 'cartes')}</strong>
-        <span>Donne : ${esc(dealer.name)} · ${esc(first.name)} commence</span></div>
+      <div class="title"><strong>Manche ${g.cur + 1}/${g.rounds.length}</strong>
+        <span>${plural(r.cards, 'carte', 'cartes')} · ${esc(dealer.name)} donne, ${esc(first.name)} commence</span></div>
+      <button class="icon-btn" data-act="openScores" aria-label="Feuille de score">📊</button>
       <button class="icon-btn" data-act="menu" aria-label="Menu">⋯</button>
     </div><div class="progress" aria-hidden="true">${prog}</div></header>`;
 }
 
-function bidChips(round, pid, act, value, target) {
+/** Boutons 0..n sur une ligne (jusqu'à 8), sinon sur deux lignes égales. */
+function bidChips(round, pid, act, value, target, label) {
+  const n = round.cards + 1;
+  const cols = n <= 8 ? n : Math.ceil(n / 2);
   let h = '';
   for (let k = 0; k <= round.cards; k++) {
     h += `<button class="chip ${value === k ? 'on' : ''} ${target === k ? 'target' : ''}" data-act="${act}" data-p="${pid}" data-v="${k}" aria-pressed="${value === k}">${k}</button>`;
   }
-  return `<div class="chips" role="group">${h}</div>`;
+  return `<div class="chips" role="group" aria-label="${esc(label || '')}" style="--cols:${cols}">${h}</div>`;
+}
+
+/** Carte d'un joueur. En petite manche (3 cartes ou moins), nom et boutons tiennent sur une ligne. */
+function playerCard(p, round, { badge = '', meta = '', chips, extra = '' }) {
+  if (round.cards <= 3) {
+    return `<div class="card pcard inline">
+      <div class="pcard-head">${avatar(p)}<span class="name">${esc(p.name)}<small>${badge ? `${badge} · ` : ''}${meta}</small></span></div>
+      ${chips}${extra ? `<div class="extra">${extra}</div>` : ''}</div>`;
+  }
+  return `<div class="card pcard">
+    <div class="pcard-head">${avatar(p)}<span class="name">${esc(p.name)}</span>
+      ${badge ? `<span class="badge dealer">${badge}</span>` : ''}<span class="meta">${meta}</span></div>
+    ${chips}${extra}</div>`;
 }
 
 function viewBids(g, round, editing) {
@@ -272,15 +297,14 @@ function viewBids(g, round, editing) {
   const cards = g.players.map((p, i) => {
     const dealer = !editing && i === g.cur % g.players.length;
     const mode = round.modes[p.id] || 'grape';
-    return `<div class="card pcard">
-      <div class="pcard-head">${avatar(p)}<span class="name">${esc(p.name)}</span>
-        ${dealer ? '<span class="badge dealer">Donne</span>' : ''}
-        <span class="meta">${fmt(sum[p.id])} pts</span></div>
-      ${bidChips(round, p.id, 'bid', round.bids[p.id])}
-      ${c.scoring === 'rascal' && c.cannonball ? `<div class="seg" role="group" aria-label="Type de tir">
+    return playerCard(p, round, {
+      badge: dealer ? 'Donne' : '',
+      meta: `${fmt(sum[p.id])} pts`,
+      chips: bidChips(round, p.id, 'bid', round.bids[p.id], null, `Annonce de ${p.name}`),
+      extra: c.scoring === 'rascal' && c.cannonball ? `<div class="seg" role="group" aria-label="Type de tir">
         <button class="${mode === 'grape' ? 'on' : ''}" data-act="mode" data-p="${p.id}" data-v="grape">✋ Mitraille</button>
-        <button class="${mode === 'cannon' ? 'on' : ''}" data-act="mode" data-p="${p.id}" data-v="cannon">✊ Boulet</button></div>` : ''}
-    </div>`;
+        <button class="${mode === 'cannon' ? 'on' : ''}" data-act="mode" data-p="${p.id}" data-v="cannon">✊ Boulet</button></div>` : '',
+    });
   }).join('');
   return cards;
 }
@@ -343,61 +367,52 @@ function viewLoot(g, round) {
     </div>`;
 }
 
-function bonusAllowance(g, round, def, pid) {
-  let total = 0;
-  const holders = new Set();
-  for (const p of g.players) {
-    if (R.bonusFactor(g.config, round, p.id) === 0) continue;
-    const n = (round.bonus[p.id] || {})[def.key] || 0;
-    total += n;
-    if (n > 0) holders.add(p.id);
-  }
-  if (total >= def.total) return false;
-  if (def.exclusive && holders.size && !holders.has(pid)) return false;
-  return true;
-}
-
 function viewBonus(g, round, scores) {
   const c = g.config;
   const defs = R.bonusDefs(c);
-  const ready = g.players.filter((p) => round.tricks[p.id] != null);
-  if (!ready.length) return '';
-  const eligible = [];
-  const without = [];
-  for (const p of ready) {
+  const cards = [];
+  const noTrick = [];
+  for (const p of g.players) {
+    const tricks = round.tricks[p.id] ?? 0;
+    const avail = defs.filter((d) => d.noTrick || tricks > 0);
+    if (!avail.length) { noTrick.push(p); continue; }
     const f = R.bonusFactor(c, round, p.id);
-    const avail = defs.filter((d) => d.noTrick || round.tricks[p.id] > 0);
-    if (f > 0 && avail.length) eligible.push({ p, f, avail });
-    else without.push({ p, reason: f === 0 ? 'annonce ratée' : 'aucun pli' });
-  }
-  const cards = eligible.map(({ p, f, avail }) => {
+    if (f === 0) {
+      cards.push(`<div class="card pcard bonus-off"><div class="pcard-head" style="margin:0">${avatar(p)}<span class="name">${esc(p.name)}</span>
+        <span class="badge bad">Annonce ratée : pas de bonus</span></div></div>`);
+      continue;
+    }
     const counts = round.bonus[p.id] || {};
     const s = scores[p.id];
     const bonusPts = s ? s.bonus : 0;
-    const open = ui.open.has(p.id) || defs.some((d) => counts[d.key]);
+    const open = ui.open.has(p.id);
+    const notes = [];
+    if (f < 1) notes.push('Écart de 1 : bonus divisés par 2');
+    if (tricks === 0) notes.push('Aucun pli : seul Davy Jones peut rapporter');
     const rows = avail.map((d) => {
       const n = counts[d.key] || 0;
-      const canAdd = bonusAllowance(g, round, d, p.id);
+      const why = R.bonusLimit(c, round, g.players, d, p.id);
       return `<div class="stepper-row"><span class="ico" aria-hidden="true">${d.icon}</span>
-        <span class="txt"><b>${d.label}</b><span>${signed(d.pts * f)} ${f < 1 ? '(moitié, tir rasant)' : 'chacun'} · ${d.hint}</span></span>
+        <span class="txt"><b>${d.label} <em class="${d.pts < 0 ? 'neg' : 'pos'}">${signed(d.pts * f)}</em></b><span>${d.hint}</span>${why ? `<span class="why">${esc(why)}</span>` : ''}</span>
         <span class="stepper">
-          <button data-act="bonus" data-p="${p.id}" data-k="${d.key}" data-d="-1" ${n ? '' : 'disabled'} aria-label="Retirer">−</button>
+          <button data-act="bonus" data-p="${p.id}" data-k="${d.key}" data-d="-1" ${n ? '' : 'disabled'} aria-label="Retirer : ${esc(d.label)}">−</button>
           <output>${n}</output>
-          <button data-act="bonus" data-p="${p.id}" data-k="${d.key}" data-d="1" ${canAdd ? '' : 'disabled'} aria-label="Ajouter">+</button>
+          <button data-act="bonus" data-p="${p.id}" data-k="${d.key}" data-d="1" ${why ? 'disabled' : ''} aria-label="Ajouter : ${esc(d.label)}">+</button>
         </span></div>`;
     }).join('');
-    return `<div class="card pcard">
+    const nb = defs.reduce((a, d) => a + (counts[d.key] || 0), 0);
+    cards.push(`<div class="card pcard ${open ? 'open' : ''}">
       <button class="bonus-toggle" data-act="toggleBonus" data-p="${p.id}" aria-expanded="${open}">
-        ${avatar(p)}<span class="name">${esc(p.name)}</span>
-        <span class="badge ${bonusPts > 0 ? 'ok' : bonusPts < 0 ? 'bad' : ''}">${bonusPts ? signed(bonusPts) : 'Aucun bonus'}</span>
-        <span class="muted">${open ? '▴' : '▾'}</span></button>
+        ${avatar(p)}<span class="name">${esc(p.name)}${notes.length ? `<small>${notes.join(' · ')}</small>` : ''}</span>
+        ${nb ? `<span class="badge ${bonusPts > 0 ? 'ok' : bonusPts < 0 ? 'bad' : ''}">${signed(bonusPts)}</span>` : '<span class="badge">Ajouter</span>'}
+        <span class="chev" aria-hidden="true">${open ? '▴' : '▾'}</span></button>
       ${open ? `<div class="bonus-body">${rows}</div>` : ''}
-    </div>`;
-  }).join('');
+    </div>`);
+  }
   return `
     <div class="section-title">Bonus</div>
-    ${eligible.length ? `<p class="lede">Touchez un joueur pour indiquer les cartes de ses plis qui rapportent un bonus.</p>${cards}` : ''}
-    ${without.length ? `<p class="lede small">Pas de bonus : ${without.map((x) => `${esc(x.p.name)} (${x.reason})`).join(', ')}.</p>` : ''}`;
+    ${cards.length ? `<p class="lede">Touchez un joueur pour compter les cartes de ses plis qui rapportent un bonus.</p>${cards.join('')}` : ''}
+    ${noTrick.length ? `<p class="lede small">Aucun pli, donc pas de bonus : ${noTrick.map((p) => esc(p.name)).join(', ')}.</p>` : ''}`;
 }
 
 const STATUS = {
@@ -435,15 +450,15 @@ function viewResults(g, round, editing) {
   const tricks = g.players.map((p) => {
     const eff = R.effectiveBid(c, round, p.id);
     const mode = c.scoring === 'rascal' && c.cannonball ? (round.modes[p.id] === 'cannon' ? ' · ✊ Boulet' : ' · ✋ Mitraille') : '';
-    return `<div class="card pcard">
-      <div class="pcard-head">${avatar(p)}<span class="name">${esc(p.name)}</span>
-        <span class="meta">Annonce <b>${eff ?? '–'}</b>${eff !== round.bids[p.id] ? ` <span class="tiny">(${round.bids[p.id]})</span>` : ''}${mode}</span></div>
-      ${bidChips(round, p.id, 'tricks', round.tricks[p.id], eff)}
-    </div>`;
+    return playerCard(p, round, {
+      meta: `Annonce <b>${eff ?? '–'}</b>${eff !== round.bids[p.id] ? ` <span class="tiny">(${round.bids[p.id]})</span>` : ''}${mode}`,
+      chips: bidChips(round, p.id, 'tricks', round.tricks[p.id], eff, `Plis de ${p.name}`),
+    });
   }).join('');
   return `
-    <div class="section-title">Plis remportés</div>
-    <p class="lede">Le point doré marque l’annonce de chaque joueur.</p>
+    <div class="section-head"><div class="section-title">Plis remportés</div>
+      <button class="btn btn-small" data-act="fillTricks">Plis = annonces</button></div>
+    <p class="lede">Tout le monde part de 0, le point doré marque l’annonce. « Plis = annonces » remplit tout : il ne reste qu’à corriger les ratés.</p>
     ${tricks}
     ${viewAbilities(g, round)}
     ${viewLoot(g, round)}
@@ -453,11 +468,11 @@ function viewResults(g, round, editing) {
 }
 
 function trickInfo(g, round) {
-  const vals = g.players.map((p) => round.tricks[p.id]).filter((v) => v != null);
-  const total = vals.reduce((a, b) => a + b, 0);
-  const missing = g.players.length - vals.length;
-  if (missing) return `<b>${missing} joueur${missing > 1 ? 's' : ''} à compléter</b><br><span class="muted">${total} / ${round.cards} plis</span>`;
-  return `<b>${total} / ${round.cards} plis</b><br><span class="muted">${total === round.cards ? 'Le compte est bon.' : total < round.cards ? 'Pli(s) sans gagnant ?' : 'Trop de plis.'}</span>`;
+  const total = g.players.reduce((a, p) => a + (round.tricks[p.id] ?? 0), 0);
+  const hint = total === round.cards ? '<span class="pos">Le compte est bon</span>'
+    : total < round.cards ? `<span class="neg">Il manque ${round.cards - total} pli${round.cards - total > 1 ? 's' : ''}</span>`
+    : `<span class="neg">${total - round.cards} pli${total - round.cards > 1 ? 's' : ''} de trop</span>`;
+  return `<b>${total} / ${round.cards} plis</b><br>${hint}`;
 }
 
 function viewRecap(g) {
@@ -479,7 +494,7 @@ function viewRecap(g) {
   return `
     <main class="page"><div class="wrap stack">
       <div class="section-title">Classement après la manche ${idx + 1}</div>
-      <div class="rank-list">${items}</div>
+      <div class="rank-list ${list.length >= 6 ? 'many' : ''}">${items}</div>
       <button class="btn btn-ghost" data-act="editCurrent">✎ Corriger cette manche</button>
     </div></main>
     <div class="bar"><div class="wrap">
@@ -498,13 +513,13 @@ function viewPlay() {
     const v = R.validateRound(g.config, round, g.players, 'bid');
     return `${topbarPlay(g)}
       <main class="page"><div class="wrap stack">
-        <div class="banner"><span class="ico">🏴‍☠️</span><span>Chacun choisit son annonce en secret, puis tout le monde la révèle en même temps au « Yo-ho-ho ! »${g.players.length === 2 ? ' N’oubliez pas la main de Barbe-Grise.' : ''}</span></div>
+        <div class="banner"><span class="ico">🏴‍☠️</span><span>Chacun choisit son annonce en secret, puis tout le monde la révèle en même temps au « Yo-ho-ho ! »${g.players.length === 2 && g.config.edition === 'new' ? ' N’oubliez pas la main de Barbe-Grise.' : ''}</span></div>
         <div class="section-title">Annonces</div>
         ${viewBids(g, round, false)}
       </div></main>
       <div class="bar"><div class="wrap">
         <div class="info">${bidTotalInfo(g, round)}</div>
-        <button class="btn btn-primary btn-lg" data-act="toResults" ${v.errors.length ? 'disabled' : ''}>Jouer la manche</button>
+        <button class="btn btn-primary btn-lg" data-act="toResults" ${v.errors.length ? 'disabled' : ''}>Saisir les plis</button>
       </div></div>`;
   }
   const v = R.validateRound(g.config, round, g.players, 'result');
@@ -513,7 +528,7 @@ function viewPlay() {
       ${viewResults(g, round, false)}
     </div></main>
     <div class="bar"><div class="wrap">
-      <button class="btn" data-act="toBids" aria-label="Revenir aux annonces">‹ Annonces</button>
+      <button class="btn btn-compact" data-act="toBids" aria-label="Revenir aux annonces">‹ Annonces</button>
       <div class="info">${trickInfo(g, round)}</div>
       <button class="btn btn-primary btn-lg" data-act="validate" ${v.errors.length ? 'disabled' : ''}>Valider</button>
     </div></div>`;
@@ -536,7 +551,7 @@ function viewEdit() {
       ${viewResults(g, draft, true)}
     </div></main>
     <div class="bar"><div class="wrap">
-      <button class="btn" data-act="cancelEdit">Annuler</button>
+      <button class="btn btn-compact" data-act="cancelEdit">Annuler</button>
       <div class="info">${trickInfo(g, draft)}</div>
       <button class="btn btn-primary btn-lg" data-act="saveEdit" ${v.errors.length ? 'disabled' : ''}>Enregistrer</button>
     </div></div>`;
@@ -545,23 +560,27 @@ function viewEdit() {
 // ---------- Tableau des scores ----------
 function scoreTable(g, clickable) {
   const { perRound, sum } = R.totals(g);
-  const head = g.players.map((p) => `<th>${avatar(p)}<br>${esc(p.name)}</th>`).join('');
+  const best = Math.max(...g.players.map((p) => sum[p.id]));
+  const anyDone = perRound.some(Boolean);
+  const lead = (p) => (anyDone && sum[p.id] === best ? 'lead' : '');
+  const many = g.players.length >= 6 ? 'many' : '';
+  const head = g.players.map((p) => `<th class="${lead(p)}">${avatar(p)}<span class="nm">${esc(p.name)}</span></th>`).join('');
   const rows = g.rounds.map((r, i) => {
     const pr = perRound[i];
     const cells = g.players.map((p) => {
-      if (!pr) return '<td class="muted">–</td>';
+      if (!pr) return `<td class="muted ${lead(p)}">–</td>`;
       const s = pr.score[p.id];
-      return `<td><span class="c">${fmt(pr.cumul[p.id])}</span><span class="s ${s.status}">${s.eff}/${s.tricks} · ${signed(s.total)}</span></td>`;
+      return `<td class="${lead(p)}"><span class="c">${fmt(pr.cumul[p.id])}</span><span class="s ${s.status}">${many ? '' : `${s.eff}/${s.tricks} · `}${signed(s.total)}</span></td>`;
     }).join('');
     const can = clickable && pr;
     return `<tr class="${can ? 'click' : ''}" ${can ? `data-act="editRound" data-i="${i}"` : ''}><td>M${i + 1}<br><span class="tiny">${r.cards} c.</span>${can ? ' ✎' : ''}</td>${cells}</tr>`;
   }).join('');
-  const foot = g.players.map((p) => `<td>${fmt(sum[p.id])}</td>`).join('');
-  return `<div class="table-wrap"><table class="scores">
+  const foot = g.players.map((p) => `<td class="${lead(p)}">${fmt(sum[p.id])}</td>`).join('');
+  return `<div class="table-wrap"><table class="scores ${many}">
     <thead><tr><th>Manche</th>${head}</tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>Total</td>${foot}</tr></tfoot></table></div>
-    <p class="tiny muted" style="padding:0 4px">Chaque case : total cumulé, puis annonce / plis · points de la manche.${clickable ? ' Touchez une manche pour la corriger.' : ''}</p>`;
+    <p class="tiny muted" style="padding:0 4px">Chaque case : total cumulé, puis ${g.players.length >= 6 ? '' : 'annonce / plis · '}points de la manche (vert : réussi, rouge : raté). Colonne dorée : en tête.${clickable ? ' Touchez une manche pour la corriger.' : ''}</p>`;
 }
 
 function viewScores() {
@@ -573,6 +592,7 @@ function viewScores() {
       <span style="width:44px"></span>
     </div></header>
     <main class="page no-bar"><div class="wrap stack">
+      <div class="standings">${R.ranking(g).map((p) => `<span class="pill">${avatar(p)}<span class="rk">${p.rank === 1 ? '👑' : `${p.rank}e`}</span> ${esc(p.name)} <b>${fmt(p.total)}</b></span>`).join('')}</div>
       ${scoreTable(g, true)}
       <button class="btn btn-block" data-act="closeScores">Retour à la partie</button>
     </div></main>`;
@@ -664,6 +684,7 @@ function viewModal() {
       <button class="btn btn-block" data-act="openScores">📜 Feuille de score</button>
       <button class="btn btn-block" data-act="rules">❓ Règles du décompte</button>
       <button class="btn btn-block" data-act="home">🏠 Accueil (la partie est conservée)</button>
+      ${db.current && db.current.rounds.some((r) => r.done) ? '<button class="btn btn-block" data-act="askEndEarly">🏁 Terminer la partie maintenant</button>' : ''}
       <button class="btn btn-block btn-danger" data-act="askAbandon">Abandonner la partie</button>
       <button class="btn btn-block btn-ghost" data-act="closeModal">Fermer</button></div>`;
   } else if (ui.modal.type === 'confirm') {
@@ -687,9 +708,39 @@ function render() {
   }
   $app.innerHTML = html + viewModal() + (ui.toast ? `<div class="toast" role="status">${esc(ui.toast)}</div>` : '');
   document.body.style.overflow = ui.modal ? 'hidden' : '';
+  syncWakeLock();
 }
 
 // ---------- Actions ----------
+function finishGame(g) {
+  g.finished = true;
+  g.finishedAt = Date.now();
+  g.phase = 'recap';
+  db.history.push(JSON.parse(JSON.stringify(g)));
+  if (db.history.length > 50) db.history.shift();
+  save();
+  go('play');
+}
+
+// Garde l'écran allumé pendant la partie (si le navigateur le permet).
+let wakeLock = null;
+let wakePending = false;
+async function syncWakeLock() {
+  if (!('wakeLock' in navigator) || wakePending) return;
+  const want = ['play', 'edit', 'scores'].includes(ui.screen) && db.current && !db.current.finished && document.visibilityState === 'visible';
+  wakePending = true;
+  try {
+    if (want && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!want && wakeLock) {
+      await wakeLock.release();
+      wakeLock = null;
+    }
+  } catch (e) { /* refusé (économie d'énergie…) : sans conséquence */ }
+  wakePending = false;
+}
+document.addEventListener('visibilitychange', syncWakeLock);
 const actions = {
   home: () => go('home'),
   resume: () => go('play'),
@@ -707,6 +758,17 @@ const actions = {
   backdrop: (d, el, e) => { if (e.target === el) { ui.modal = null; render(); } },
   askAbandon: () => { ui.modal = { type: 'confirm', title: 'Abandonner la partie ?', text: 'Les scores de cette partie seront effacés.', ok: 'abandon', okLabel: 'Abandonner' }; render(); },
   abandon: () => { db.current = null; save(); go('home'); },
+  askEndEarly: () => {
+    const done = db.current.rounds.filter((r) => r.done).length;
+    ui.modal = { type: 'confirm', title: 'Terminer la partie maintenant ?', text: `Le classement final sera calculé sur ${plural(done, 'manche jouée', 'manches jouées')}. La manche en cours, si elle n’est pas validée, ne compte pas.`, ok: 'endEarly', okLabel: 'Terminer' };
+    render();
+  },
+  endEarly: () => {
+    const g = db.current;
+    g.rounds = g.rounds.filter((r) => r.done);
+    g.cur = g.rounds.length - 1;
+    finishGame(g);
+  },
 
   // Préparation
   addPlayer: () => { ui.setup.players.push({ id: uid(), name: '' }); render(); focusLastName(); },
@@ -724,6 +786,12 @@ const actions = {
   bid: (d) => { const { round } = ctx(); round.bids[d.p] = +d.v; commit(); },
   mode: (d) => { const { round } = ctx(); round.modes[d.p] = d.v; commit(); },
   tricks: (d) => { const { round } = ctx(); round.tricks[d.p] = +d.v; commit(); },
+  fillTricks: () => {
+    const { game, round } = ctx();
+    for (const p of game.players) round.tricks[p.id] = R.effectiveBid(game.config, round, p.id) ?? 0;
+    commit();
+    toast('Plis remplis avec les annonces');
+  },
   bonus: (d) => {
     const { round } = ctx();
     const b = (round.bonus[d.p] = round.bonus[d.p] || {});
@@ -753,12 +821,7 @@ const actions = {
   nextRound: () => {
     const g = db.current;
     if (g.cur >= g.rounds.length - 1) {
-      g.finished = true;
-      g.finishedAt = Date.now();
-      db.history.push(JSON.parse(JSON.stringify(g)));
-      if (db.history.length > 50) db.history.shift();
-      save();
-      go('play');
+      finishGame(g);
       return;
     }
     g.cur += 1;
@@ -803,7 +866,11 @@ $app.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.act];
-  if (fn) fn(el.dataset, el, e);
+  if (!fn) return;
+  if (['bid', 'tricks', 'bonus'].includes(el.dataset.act) && navigator.vibrate && navigator.userActivation?.isActive) {
+    try { navigator.vibrate(8); } catch (err) { /* pas de vibration */ }
+  }
+  fn(el.dataset, el, e);
 });
 $app.addEventListener('change', (e) => {
   const el = e.target;

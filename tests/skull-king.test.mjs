@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   defaultConfig, normalizeConfig, newRound, scoreRound, validateRound,
-  roundsFor, deckSize, bonusDefs,
+  roundsFor, deckSize, bonusDefs, fillDefaults, bonusLimit, handsDealt,
 } from '../skull-king/rules.js';
 
 const cfg = (o = {}) => normalizeConfig({ ...defaultConfig(), ...o });
@@ -141,4 +141,30 @@ test('validation : total des plis, Kraken, bonus sans pli', () => {
 test('bonus Davy Jones visible seulement avec un monstre marin', () => {
   assert.ok(bonusDefs(cfg({ pack: true })).some((d) => d.key === 'davy'));
   assert.ok(!bonusDefs(cfg({ pack: true, packStingray: false })).some((d) => d.key === 'davy'));
+});
+
+test('annonces et plis à 0 par défaut', () => {
+  const r = fillDefaults(newRound(3), ['a', 'b']);
+  assert.deepEqual(r.bids, { a: 0, b: 0 });
+  assert.deepEqual(r.tricks, { a: 0, b: 0 });
+  const v = validateRound(cfg(), r, players.slice(0, 2));
+  assert.match(v.errors[0], /il en manque 3/);
+});
+
+test('Barbe-Grise seulement dans l’édition actuelle', () => {
+  assert.equal(handsDealt(2, cfg()), 3);
+  assert.equal(handsDealt(2, cfg({ edition: 'old' })), 2);
+});
+
+test('bonusLimit : carte unique déjà attribuée, maximum atteint', () => {
+  const c = cfg();
+  const r = round(3, [1, 1, 1], [1, 1, 1], { bonus: { a: { sk: 1, c14: 2 }, b: { c14: 1 } } });
+  const sk = bonusDefs(c).find((d) => d.key === 'sk');
+  const c14 = bonusDefs(c).find((d) => d.key === 'c14');
+  assert.equal(bonusLimit(c, r, players.slice(0, 3), sk, 'b'), 'Déjà attribué à A');
+  assert.match(bonusLimit(c, r, players.slice(0, 3), c14, 'c'), /3 cartes/);
+  assert.equal(bonusLimit(c, r, players.slice(0, 3), sk, 'c') !== null, true);
+  // Un joueur qui rate son annonce ne bloque pas les autres.
+  const r2 = round(3, [2, 1], [1, 2], { bonus: { a: { sk: 1 } } });
+  assert.equal(bonusLimit(c, r2, players.slice(0, 2), sk, 'b'), null);
 });
