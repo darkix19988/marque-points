@@ -1,0 +1,73 @@
+/* Dépenses — styles propres à l'outil (le reste vient de assets/css/app.css) */
+.field {
+  width: 100%; min-height: 48px; border-radius: var(--radius-sm); border: 1px solid var(--line);
+  background: var(--surface); padding: 10px 14px; font-size: 16px;
+}
+.field:focus { outline: none; border-color: var(--accent); }
+select.field { appearance: auto; }
+textarea.field { resize: vertical; font-family: inherit; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.group-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; }
+.group-card .grow { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.group-card .grow b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-card .sum { font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.faces { display: flex; margin-top: 6px; }
+.faces .avatar { width: 24px; height: 24px; font-size: 11px; margin-right: -6px; box-shadow: 0 0 0 2px var(--surface); }
+.faces .more { margin-left: 12px; font-size: 12px; color: var(--ink-3); align-self: center; }
+
+.tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+.tabs button { border: 0; background: none; min-height: 40px; border-radius: 999px; font-weight: 700; color: var(--ink-2); font-size: 15px; }
+.tabs button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.small-tabs button { min-height: 34px; font-size: 14px; }
+
+.list-card { padding: 2px 14px; }
+.item-row, .bal-row, .move-row, .split-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; text-align: left;
+  border: 0; border-top: 1px solid var(--line); background: none;
+}
+.list-card > :first-child { border-top: 0; }
+.item-row .cat { font-size: 22px; width: 32px; text-align: center; flex: none; }
+.grow { flex: 1; min-width: 0; }
+.item-row .grow b, .bal-row .grow b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-row .grow span, .bal-row .grow > span { display: block; }
+.amt { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bal-row .avatar, .move-row .avatar, .split-row .avatar { width: 30px; height: 30px; font-size: 13px; }
+.bal-bar { display: block; height: 6px; border-radius: 6px; background: var(--surface-2); margin-top: 6px; overflow: hidden; }
+.bal-bar i { display: block; height: 100%; border-radius: 6px; }
+.bal-bar.up i { background: var(--ok); }
+.bal-bar.down i { background: var(--bad); }
+.move-row .grow { font-size: 15px; }
+
+.empty { text-align: center; padding: 36px 16px; display: grid; gap: 6px; justify-items: center; }
+.empty .big { font-size: 44px; }
+.small-empty { padding: 18px 16px; }
+
+.amount-box { display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 10px 0 2px; }
+.amount-input {
+  width: 100%; max-width: 260px; border: 0; border-bottom: 2px solid var(--line); background: transparent;
+  text-align: center; font-size: 44px; font-weight: 800; padding: 4px 0; font-variant-numeric: tabular-nums;
+}
+.amount-input:focus { outline: none; border-color: var(--accent); }
+.amount-box .cur { font-size: 26px; font-weight: 700; color: var(--ink-2); }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tags .chip { min-width: 0; }
+.cats .chip { padding: 0 12px; }
+
+.check-row { cursor: pointer; }
+.check-row .check {
+  width: 24px; height: 24px; border-radius: 7px; border: 2px solid var(--line); flex: none;
+  display: grid; place-items: center; font-size: 14px; font-weight: 800; color: #fff;
+}
+.check-row.on .check { background: var(--accent); border-color: var(--accent); }
+.check-row:not(.on) .grow, .check-row:not(.on) .avatar { opacity: .5; }
+.split-row .grow .tiny { display: block; }
+.money-input {
+  width: 96px; height: 40px; text-align: right; font-weight: 700; font-size: 16px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-variant-numeric: tabular-nums;
+}
+.money-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.total-row { font-weight: 600; }
+
+.toast-btn { margin-left: 8px; border: 0; background: none; color: var(--gold); font-weight: 800; padding: 2px 4px; }

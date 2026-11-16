@@ -10,14 +10,17 @@
   <link rel="icon" href="assets/img/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/img/icon-192.png">
   <script src="assets/js/theme.js"></script>
-  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/base.css?v=6">
   <style>
     .hero { padding: 48px 0 28px; position: relative; }
     .theme-btn { position: absolute; top: 16px; right: -6px; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 600; }
     .hero .logo { font-size: 44px; line-height: 1; }
     .hero h1 { font-size: 34px; margin-top: 14px; }
     .hero p { margin-top: 8px; font-size: 17px; }
-    .games { display: grid; gap: 14px; padding-bottom: 48px; }
+    .games { display: grid; gap: 14px; padding-bottom: 28px; }
+    .group-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin: 0 4px 10px; }
+    .game .art.money { background: #12301f; }
+    .reload { border: 0; background: none; color: var(--ink-2); text-decoration: underline; font-size: 12px; padding: 8px; }
     .game {
       display: flex; gap: 16px; align-items: center; text-decoration: none;
       padding: 18px; border-radius: var(--radius); background: var(--surface);
@@ -44,9 +47,10 @@
       <button class="theme-btn" id="theme-btn" type="button"></button>
       <div class="logo" aria-hidden="true">🎲</div>
       <h1>Marque-points</h1>
-      <p class="muted">Choisissez un jeu, entrez les annonces et les résultats : le site applique les règles et fait les calculs.</p>
+      <p class="muted">Des compteurs pour vos jeux et un outil pour partager les dépenses : vous saisissez, le site fait les calculs.</p>
     </header>
 
+    <h2 class="group-title">Jeux</h2>
     <section class="games" aria-label="Jeux">
       <a class="game" href="skull-king/">
         <div class="art" aria-hidden="true">☠️</div>
@@ -64,16 +68,22 @@
         </div>
         <span class="go" aria-hidden="true">›</span>
       </a>
-      <div class="game soon" aria-disabled="true">
-        <div class="art" aria-hidden="true">＋</div>
+    </section>
+
+    <h2 class="group-title">Outils</h2>
+    <section class="games" aria-label="Outils">
+      <a class="game" href="depenses/">
+        <div class="art money" aria-hidden="true">💸</div>
         <div>
-          <h2>D’autres jeux arrivent</h2>
-          <p class="muted small">Skull King est le premier jeu disponible.</p>
+          <h2>Dépenses</h2>
+          <p class="muted small">Qui a payé quoi, qui doit combien à qui. Idéal pour un week-end ou une coloc.</p>
+          <span class="resume" id="dep-info" hidden></span>
         </div>
-      </div>
+        <span class="go" aria-hidden="true">›</span>
+      </a>
     </section>
   </main>
-  <footer class="wrap muted tiny">Les parties sont enregistrées sur cet appareil, rien n’est envoyé en ligne.</footer>
+  <footer class="wrap muted tiny">Tout est enregistré sur cet appareil, rien n’est envoyé en ligne.<br><button class="reload" type="button" onclick="mpReload()">Recharger l’application</button></footer>
   <script>
     try {
       const sk = JSON.parse(localStorage.getItem('marque-points:skull-king:v1') || 'null');
@@ -83,7 +93,12 @@
     const showTheme = () => { tb.textContent = `${mpTheme.icon()} ${mpTheme.label()}`; tb.setAttribute('aria-label', `Thème : ${mpTheme.label()}, toucher pour changer`); };
     tb.addEventListener('click', () => { mpTheme.cycle(); showTheme(); });
     showTheme();
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    try {
+      const dep = JSON.parse(localStorage.getItem('marque-points:depenses:v1') || 'null');
+      const n = dep && dep.groups ? dep.groups.length : 0;
+      if (n) { const el = document.getElementById('dep-info'); el.textContent = `${n} groupe${n > 1 ? 's' : ''} enregistré${n > 1 ? 's' : ''}`; el.hidden = false; }
+    } catch (e) { /* stockage indisponible */ }
   </script>
+  <script src="assets/js/update.js" data-version="6" data-root="./" defer></script>
 </body>
 </html>

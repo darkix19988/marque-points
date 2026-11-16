@@ -1,6 +1,6 @@
 // Skull King — interface du compteur de points
 // Le numéro de version force le chargement de app.js et rules.js ensemble après une mise à jour.
-import * as R from './rules.js?v=5';
+import * as R from './rules.js?v=6';
 
 const KEY = 'marque-points:skull-king:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
@@ -125,6 +125,7 @@ function viewHome() {
       </div>
       ${resume}
       <button class="btn ${g ? '' : 'btn-primary'} btn-lg btn-block" data-act="newGame">${g ? 'Nouvelle partie' : 'Commencer une partie'}</button>
+      <button class="btn btn-ghost btn-small" data-act="reloadApp" style="justify-self:center">🔄 Recharger l’application</button>
       ${histHtml}
     </div></main>`;
 }
@@ -750,6 +751,7 @@ function viewModal() {
       <button class="btn btn-block" data-act="openScores">📜 Feuille de score</button>
       <button class="btn btn-block" data-act="rules">❓ Règles du décompte</button>
       <button class="btn btn-block" data-act="theme">${window.mpTheme ? `${mpTheme.icon()} Thème : ${mpTheme.label()}` : 'Thème'}</button>
+      <button class="btn btn-block" data-act="reloadApp">🔄 Recharger l’application</button>
       <button class="btn btn-block" data-act="home">🏠 Accueil (la partie est conservée)</button>
       ${db.current && db.current.rounds.some((r) => r.done) ? '<button class="btn btn-block" data-act="askEndEarly">🏁 Terminer la partie maintenant</button>' : ''}
       <button class="btn btn-block btn-danger" data-act="askAbandon">Abandonner la partie</button>
@@ -837,6 +839,7 @@ const actions = {
   rules: () => { ui.modal = { type: 'rules', config: db.current && ui.screen !== 'home' ? db.current.config : (db.lastConfig ? R.normalizeConfig(db.lastConfig) : R.defaultConfig()) }; render(); },
   rulesSetup: () => { ui.modal = { type: 'rules', config: R.normalizeConfig(ui.setup.config) }; render(); },
   menu: () => { ui.modal = { type: 'menu' }; render(); },
+  reloadApp: () => { if (window.mpReload) mpReload(); else location.reload(); },
   theme: () => {
     if (!window.mpTheme) return;
     mpTheme.cycle();

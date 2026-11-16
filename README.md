@@ -1,6 +1,6 @@
 # Marque-points
 
-Compteur de points pour jeux de société, en ligne avec GitHub Pages. Le site est statique, sans dépendance ni étape de build, et il fonctionne hors ligne une fois chargé.
+Compteurs de points pour jeux de société et partage des dépenses entre amis, en ligne avec GitHub Pages. Le site est statique, sans dépendance ni étape de build, et il fonctionne hors ligne une fois chargé.
 
 ## Jeux
 
@@ -19,6 +19,15 @@ Thème clair, sombre ou automatique (suit le téléphone), au choix.
 
 Les parties sont enregistrées dans le navigateur (`localStorage`). Rien n'est envoyé sur Internet.
 
+### Dépenses
+
+Partage des frais d'un groupe (week-end, coloc, soirée), sur un seul téléphone.
+
+- Dépenses à parts égales, par parts (un couple = 2 parts) ou en montants précis, avec catégories.
+- Soldes de chacun et remboursements proposés avec le moins de virements possible ; « Fait ✓ » enregistre le remboursement.
+- Résumé à partager par message, export / import d'un groupe en fichier pour changer de téléphone.
+- Montants calculés en centimes : aucun centime perdu dans les arrondis.
+
 ## Structure
 
 ```
@@ -26,11 +35,14 @@ index.html            accueil, liste des jeux
 assets/               styles et icônes partagés
 skull-king/rules.js   règles et calcul des points (sans DOM, testé)
 skull-king/app.js     interface
+depenses/money.js     calculs du partage des dépenses (sans DOM, testé)
+depenses/app.js       interface des dépenses
+assets/js/update.js   détection des mises à jour (bandeau « Mettre à jour »)
 sw.js                 cache hors ligne
 tests/                tests du décompte (node --test tests/)
 ```
 
-À chaque mise à jour de `app.js` ou `rules.js`, incrémenter le `?v=` dans `skull-king/index.html` et dans l'import de `app.js` (et `CACHE` dans `sw.js`) : les deux fichiers sont ainsi toujours chargés dans la même version.
+**À chaque mise à jour**, incrémenter le même numéro partout : `version.json`, les `data-version` et `?v=` des pages HTML, les `?v=` des imports dans les `app.js` et `CACHE` dans `sw.js`. Les fichiers d'une page sont ainsi toujours chargés dans la même version, et le bandeau « Nouvelle version disponible » apparaît chez ceux qui ont installé le site en web app.
 
 Pour ajouter un jeu : créer un dossier `nom-du-jeu/` sur le modèle de `skull-king/`, puis l'ajouter à `index.html` et à la liste `SHELL` de `sw.js`.
 
