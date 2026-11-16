@@ -1,5 +1,5 @@
 // Service worker : le site fonctionne hors ligne (réseau d'abord, cache en secours).
-const CACHE = 'marque-points-v7';
+const CACHE = 'marque-points-v8';
 const SHELL = [
   './',
   'index.html',
@@ -21,7 +21,10 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // cache: 'reload' : on prend les fichiers en ligne, pas une vieille copie du navigateur.
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -37,9 +40,14 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.endsWith('/version.json')) return; // toujours la version en ligne, jamais en cache
+  // Les pages sont toujours revérifiées en ligne : sinon le téléphone ressert une copie
+  // de plusieurs minutes et le bandeau « nouvelle version » revient sans arrêt.
+  const isPage = req.mode === 'navigate' || req.destination === 'document';
+  const fresh = isPage ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req);
   e.respondWith(
-    fetch(req)
+    fresh
       .then((res) => {
+        if (isPage && res.redirected) return Response.redirect(res.url, 302);
         if (res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy));

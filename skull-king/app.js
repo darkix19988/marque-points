@@ -1,6 +1,6 @@
 // Skull King — interface du compteur de points
 // Le numéro de version force le chargement de app.js et rules.js ensemble après une mise à jour.
-import * as R from './rules.js?v=7';
+import * as R from './rules.js?v=8';
 
 const KEY = 'marque-points:skull-king:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];

@@ -9,7 +9,10 @@
   if ('serviceWorker' in navigator) navigator.serviceWorker.register(ROOT + 'sw.js').catch(function () {});
 
   // Recharge en contournant tous les caches (navigateur, service worker, serveur de GitHub).
+  var TRIED = 'marque-points:update-tried';
+
   function reload(v) {
+    try { if (v) sessionStorage.setItem(TRIED, String(v)); } catch (e) { /* pas grave */ }
     var clear = window.caches
       ? caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); })
       : Promise.resolve();
@@ -33,7 +36,15 @@
     if (shown || !VERSION || navigator.onLine === false) return;
     fetch(ROOT + 'version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d && String(d.v) !== String(VERSION)) banner(d.v); })
+      .then(function (d) {
+        if (!d || !(Number(d.v) > Number(VERSION))) return;
+        // Déjà rechargé pour cette version mais la page reste ancienne (copie en route) :
+        // on ne réaffiche pas le bandeau, la bonne version arrivera à la prochaine ouverture.
+        var tried = null;
+        try { tried = sessionStorage.getItem(TRIED); } catch (e) { /* pas grave */ }
+        if (tried === String(d.v)) return;
+        banner(d.v);
+      })
       .catch(function () {});
   }
 
