@@ -38,6 +38,7 @@ export function defaultConfig() {
     kraken: false,
     whale: false,
     abilities: false, // pouvoirs des pirates
+    bonusMode: 'cards', // 'cards' : on compte les cartes bonus ; 'points' : on saisit directement les points
     pack: false, // Expansion Pack 2025
     packCon: true,
     packStingray: true,
@@ -61,9 +62,10 @@ export function minPlayers() {
   return 2;
 }
 
-export function maxPlayers(c) {
+/** Nombre de joueurs conseillé par la règle. Ce n'est pas une limite : on peut jouer à plus. */
+export function recommendedPlayers(c) {
   if (c.edition === 'old') return EDITIONS.old.maxPlayers;
-  return c.pack ? 12 : EDITIONS.new.maxPlayers;
+  return c.pack ? 9 : EDITIONS.new.maxPlayers;
 }
 
 /** Édition actuelle à 2 joueurs : une 3e main pour le fantôme de Barbe-Grise. */
@@ -92,7 +94,7 @@ export function deckSize(c, nPlayers) {
 }
 
 export function maxCardsPerHand(c, nPlayers) {
-  return Math.floor(deckSize(c, nPlayers) / handsDealt(nPlayers, c));
+  return Math.max(1, Math.floor(deckSize(c, nPlayers) / handsDealt(nPlayers, c)));
 }
 
 export function scheduleRounds(c) {
@@ -236,6 +238,7 @@ export function fillDefaults(round, playerIds) {
   round.loots = round.loots || [];
   round.modes = round.modes || {};
   round.bonus = round.bonus || {};
+  round.free = round.free || {};
   return round;
 }
 
@@ -247,7 +250,7 @@ export function bonusLimit(c, round, players, def, pid) {
   let total = 0;
   let holder = null;
   for (const p of players) {
-    if (bonusFactor(c, round, p.id) === 0) continue;
+    if (bonusFactor(c, round, p.id) === 0 || freeBonus(round, p.id) != null) continue;
     const n = (round.bonus[p.id] || {})[def.key] || 0;
     total += n;
     if (n > 0 && p.id !== pid && !holder) holder = p;
@@ -255,6 +258,12 @@ export function bonusLimit(c, round, players, def, pid) {
   if (def.exclusive && holder) return `Déjà attribué à ${holder.name}`;
   if (total >= def.total) return def.total === 1 ? 'Une seule carte dans le jeu' : `${def.total} cartes au maximum dans le jeu`;
   return null;
+}
+
+/** Bonus saisi directement en points pour ce joueur, ou null s'il est compté par cartes. */
+export function freeBonus(round, pid) {
+  const v = round.free && round.free[pid];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
 /** Annonce finale d'un joueur, après un éventuel coup de Harry le Géant. */
@@ -331,11 +340,18 @@ export function scoreRound(c, round, roundNumber, playerIds) {
     const counts = round.bonus[pid] || {};
     let raw = 0;
     const detail = [];
-    for (const d of defs) {
-      const n = counts[d.key] || 0;
-      if (n > 0) {
-        raw += n * d.pts;
-        detail.push({ key: d.key, label: d.label, count: n, pts: n * d.pts * factor });
+    const free = freeBonus(round, pid);
+    if (free != null) {
+      // Bonus saisi directement en points (joueurs expérimentés).
+      raw = free;
+      if (free) detail.push({ key: 'free', label: 'Bonus saisi', count: 1, pts: free * factor });
+    } else {
+      for (const d of defs) {
+        const n = counts[d.key] || 0;
+        if (n > 0) {
+          raw += n * d.pts;
+          detail.push({ key: d.key, label: d.label, count: n, pts: n * d.pts * factor });
+        }
       }
     }
     let bonus = raw * factor;
@@ -430,11 +446,18 @@ export function validateRound(c, round, players, phase = 'result') {
 
   // Bonus de capture sans pli remporté, et dépassement du nombre de cartes existantes.
   const defs = bonusDefs(c);
+  const noTrickBonus = defs.some((d) => d.noTrick);
+  for (const p of players) {
+    const free = freeBonus(round, p.id);
+    if (free && bonusFactor(c, round, p.id) > 0 && round.tricks[p.id] === 0 && !noTrickBonus) {
+      errors.push(`${p.name} a un bonus sans avoir remporté de pli.`);
+    }
+  }
   for (const d of defs) {
     let total = 0;
     let holders = 0;
     for (const p of players) {
-      if (bonusFactor(c, round, p.id) === 0) continue;
+      if (bonusFactor(c, round, p.id) === 0 || freeBonus(round, p.id) != null) continue;
       const n = (round.bonus[p.id] || {})[d.key] || 0;
       if (!n) continue;
       total += n;

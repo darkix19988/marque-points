@@ -1,10 +1,11 @@
 // Service worker : le site fonctionne hors ligne (réseau d'abord, cache en secours).
-const CACHE = 'marque-points-v2';
+const CACHE = 'marque-points-v3';
 const SHELL = [
   './',
   'index.html',
   'manifest.webmanifest',
   'assets/css/base.css',
+  'assets/js/theme.js',
   'assets/img/icon.svg',
   'skull-king/',
   'skull-king/index.html',

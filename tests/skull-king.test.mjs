@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   defaultConfig, normalizeConfig, newRound, scoreRound, validateRound,
-  roundsFor, deckSize, bonusDefs, fillDefaults, bonusLimit, handsDealt,
+  roundsFor, deckSize, bonusDefs, fillDefaults, bonusLimit, handsDealt, recommendedPlayers,
 } from '../skull-king/rules.js';
 
 const cfg = (o = {}) => normalizeConfig({ ...defaultConfig(), ...o });
@@ -167,4 +167,27 @@ test('bonusLimit : carte unique déjà attribuée, maximum atteint', () => {
   // Un joueur qui rate son annonce ne bloque pas les autres.
   const r2 = round(3, [2, 1], [1, 2], { bonus: { a: { sk: 1 } } });
   assert.equal(bonusLimit(c, r2, players.slice(0, 2), sk, 'b'), null);
+});
+
+test('bonus saisi directement : compte seulement si l’annonce est juste, moitié en tir rasant', () => {
+  const r = round(4, [2, 1, 1], [2, 2, 0], { free: { a: 50, b: 30, c: 40 } });
+  const s = scoreRound(cfg(), r, 4, ['a', 'b', 'c']);
+  assert.equal(s.a.total, 40 + 50);
+  assert.equal(s.b.total, -10);
+  const rascal = scoreRound(cfg({ scoring: 'rascal' }), r, 4, ['a', 'b', 'c']);
+  assert.equal(rascal.b.total, 20 + 15);
+});
+
+test('bonus saisi : prioritaire sur les cartes comptées, refusé sans pli', () => {
+  const r = round(3, [1, 0], [1, 0], { bonus: { a: { sk: 1 } }, free: { a: 10 } });
+  assert.equal(scoreRound(cfg(), r, 3, ['a', 'b']).a.total, 30);
+  const r2 = round(3, [1, 0], [3, 0], { free: { b: 20 } });
+  const v = validateRound(cfg(), r2, players.slice(0, 2));
+  assert.ok(v.errors.some((e) => /B a un bonus sans/.test(e)));
+});
+
+test('pas de limite de joueurs : au moins 1 carte par manche', () => {
+  assert.equal(recommendedPlayers(cfg()), 8);
+  assert.deepEqual(roundsFor(cfg(), 20).slice(0, 4), [1, 2, 3, 3]);
+  assert.deepEqual(roundsFor(cfg(), 100), Array(10).fill(1));
 });

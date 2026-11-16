@@ -3,6 +3,7 @@ import * as R from './rules.js';
 
 const KEY = 'marque-points:skull-king:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
+const colorFor = (i) => (i < COLORS.length ? COLORS[i] : `hsl(${(i * 47) % 360} 55% 42%)`);
 const $app = document.getElementById('app');
 
 // ---------- Données ----------
@@ -74,6 +75,10 @@ function commit() {
   render();
 }
 
+const themeButton = () => (window.mpTheme
+  ? `<button class="icon-btn" data-act="theme" aria-label="Thème : ${mpTheme.label()}, toucher pour changer" title="Thème : ${mpTheme.label()}">${mpTheme.icon()}</button>`
+  : '');
+
 // ---------- Écran : accueil ----------
 function viewHome() {
   const g = db.current && !db.current.finished ? db.current : null;
@@ -108,6 +113,7 @@ function viewHome() {
     <header class="topbar"><div class="wrap">
       <a class="icon-btn" href="../" aria-label="Tous les jeux">‹</a>
       <div class="title"><strong>Skull King</strong><span>Compteur de points</span></div>
+      ${themeButton()}
       <button class="icon-btn" data-act="rules" aria-label="Règles du décompte">?</button>
     </div></header>
     <main class="page no-bar"><div class="wrap stack">
@@ -143,18 +149,18 @@ function viewSetup() {
   const s = ui.setup;
   const c = s.config;
   const n = s.players.length;
-  const max = R.maxPlayers(c);
+  const advised = R.recommendedPlayers(c);
   const isNew = c.edition === 'new';
   const sched = R.scheduleRounds(c);
   const rounds = R.roundsFor(c, Math.max(2, n));
   const capped = rounds.some((k, i) => k !== sched[i]);
   const issues = [];
   if (n < 2) issues.push('Il faut au moins 2 joueurs.');
-  if (n > max) issues.push(`${n} joueurs, c’est trop pour cette configuration (${max} au maximum).`);
+
 
   const players = s.players.map((p, i) => `
     <div class="player-row">
-      <span class="avatar" style="--c:${COLORS[i % COLORS.length]}" aria-hidden="true">${i + 1}</span>
+      <span class="avatar" style="--c:${colorFor(i)}" aria-hidden="true">${i + 1}</span>
       <input type="text" value="${esc(p.name)}" placeholder="Joueur ${i + 1}" data-input="pname" data-i="${i}" autocomplete="off" enterkeyhint="next" maxlength="20" aria-label="Nom du joueur ${i + 1}">
       ${i > 0 ? `<button class="icon-btn" data-act="movePlayer" data-i="${i}" aria-label="Monter">↑</button>` : '<span style="width:38px"></span>'}
       <button class="icon-btn" data-act="delPlayer" data-i="${i}" aria-label="Retirer">✕</button>
@@ -173,6 +179,7 @@ function viewSetup() {
     <header class="topbar"><div class="wrap">
       <button class="icon-btn" data-act="home" aria-label="Retour">‹</button>
       <div class="title"><strong>Nouvelle partie</strong><span>Joueurs et règles</span></div>
+      ${themeButton()}
       <button class="icon-btn" data-act="rulesSetup" aria-label="Règles du décompte">?</button>
     </div></header>
     <main class="page"><div class="wrap stack">
@@ -180,7 +187,8 @@ function viewSetup() {
       <div class="card stack" style="gap:8px">
         <p class="muted small">Dans l’ordre du tour de table : le joueur 1 distribue la première manche.</p>
         ${players}
-        ${n < max ? '<button class="btn" data-act="addPlayer">+ Ajouter un joueur</button>' : ''}
+        <button class="btn" data-act="addPlayer">+ Ajouter un joueur</button>
+        ${n > advised ? `<p class="small" style="color:var(--warn)">La règle conseille ${advised} joueurs au maximum avec ces cartes. Pas de souci pour jouer à ${n} : le nombre de cartes par manche est plafonné pour que tout le monde en ait autant.</p>` : ''}
         ${n === 2 && isNew ? '<p class="small muted">À 2 joueurs, on distribue une 3e main au fantôme de Barbe-Grise : il joue toujours en 2e position et n’a pas de score.</p>' : ''}
       </div>
 
@@ -218,6 +226,12 @@ function viewSetup() {
         </div>` : ''}
       </div>` : ''}
 
+      <div class="section-title">Saisie des bonus</div>
+      <div class="choices two">
+        ${choice('bonusMode', 'cards', c.bonusMode, 'Compter les cartes', 'On indique les 14, pirates, sirènes… capturés : le site calcule.')}
+        ${choice('bonusMode', 'points', c.bonusMode, 'Saisir le score', 'Plus rapide pour les habitués : on tape directement les points de bonus.')}
+      </div>
+
       <div class="section-title">Manches</div>
       <div class="choices">
         ${R.SCHEDULES.map((x) => choice('schedule', x.id, c.schedule, x.label, x.sub)).join('')}
@@ -239,7 +253,7 @@ function viewSetup() {
 
 function startGame() {
   const s = ui.setup;
-  const players = s.players.map((p, i) => ({ id: p.id, name: p.name.trim() || `Joueur ${i + 1}`, color: COLORS[i % COLORS.length] }));
+  const players = s.players.map((p, i) => ({ id: p.id, name: p.name.trim() || `Joueur ${i + 1}`, color: colorFor(i) }));
   const config = R.normalizeConfig(s.config);
   const ids = players.map((p) => p.id);
   const rounds = R.roundsFor(config, players.length).map((k) => R.fillDefaults(R.newRound(k), ids));
@@ -367,8 +381,58 @@ function viewLoot(g, round) {
     </div>`;
 }
 
+function noBonusNote(noTrick, missed) {
+  const parts = [];
+  if (missed.length) parts.push(`annonce ratée pour ${missed.map((p) => esc(p.name)).join(', ')}`);
+  if (noTrick.length) parts.push(`aucun pli pour ${noTrick.map((p) => esc(p.name)).join(', ')}`);
+  return parts.length ? `<p class="lede small">Pas de bonus : ${parts.join(' ; ')}.</p>` : '';
+}
+
+/** Total brut des bonus comptés par cartes pour un joueur. */
+function cardBonusRaw(g, round, pid) {
+  const counts = round.bonus[pid] || {};
+  return R.bonusDefs(g.config).reduce((a, d) => a + (counts[d.key] || 0) * d.pts, 0);
+}
+
+function bonusModeSwitch(g) {
+  const pts = g.config.bonusMode === 'points';
+  return `<button class="btn btn-small" data-act="switchBonusMode" data-v="${pts ? 'cards' : 'points'}">${pts ? 'Compter les cartes' : 'Saisir le score'}</button>`;
+}
+
+function viewFreeBonus(g, round, scores) {
+  const c = g.config;
+  const defs = R.bonusDefs(c);
+  const step = c.pack ? 5 : 10;
+  const rows = [];
+  const noTrick = [];
+  const missed = [];
+  for (const p of g.players) {
+    const tricks = round.tricks[p.id] ?? 0;
+    const f = R.bonusFactor(c, round, p.id);
+    const possible = tricks > 0 || defs.some((d) => d.noTrick);
+    if (!possible) { noTrick.push(p); continue; }
+    if (f === 0) { missed.push(p); continue; }
+    const free = R.freeBonus(round, p.id);
+    const raw = free ?? cardBonusRaw(g, round, p.id);
+    const s = scores[p.id];
+    rows.push(`<div class="free-row">
+      ${avatar(p)}<span class="name">${esc(p.name)}${f < 1 ? `<small>Écart de 1 : compte pour ${signed(raw * f)}</small>` : ''}</span>
+      <span class="stepper">
+        <button data-act="freeStep" data-p="${p.id}" data-d="${-step}" aria-label="Moins ${step}">−</button>
+        <input class="free-input" type="text" inputmode="numeric" pattern="-?[0-9]*" value="${raw || ''}" placeholder="0" data-input="free" data-p="${p.id}" aria-label="Bonus de ${esc(p.name)}">
+        <button data-act="freeStep" data-p="${p.id}" data-d="${step}" aria-label="Plus ${step}">+</button>
+      </span></div>`);
+  }
+  return `
+    <div class="section-head"><div class="section-title">Bonus</div>${bonusModeSwitch(g)}</div>
+    ${rows.length ? `<p class="lede">Tapez les points de bonus de chaque joueur, ou utilisez − et + (par ${step}).${c.loot ? ' Le Butin se règle à part, plus haut.' : ''}</p>
+      <div class="card free-list">${rows.join('')}</div>` : ''}
+    ${noBonusNote(noTrick, missed)}`;
+}
+
 function viewBonus(g, round, scores) {
   const c = g.config;
+  if (c.bonusMode === 'points') return viewFreeBonus(g, round, scores);
   const defs = R.bonusDefs(c);
   const cards = [];
   const noTrick = [];
@@ -389,6 +453,8 @@ function viewBonus(g, round, scores) {
     const notes = [];
     if (f < 1) notes.push('Écart de 1 : bonus divisés par 2');
     if (tricks === 0) notes.push('Aucun pli : seul Davy Jones peut rapporter');
+    const typed = R.freeBonus(round, p.id);
+    if (typed != null) notes.push(`Score tapé à la main (${signed(typed)}), remplacé si vous comptez une carte`);
     const rows = avail.map((d) => {
       const n = counts[d.key] || 0;
       const why = R.bonusLimit(c, round, g.players, d, p.id);
@@ -404,15 +470,15 @@ function viewBonus(g, round, scores) {
     cards.push(`<div class="card pcard ${open ? 'open' : ''}">
       <button class="bonus-toggle" data-act="toggleBonus" data-p="${p.id}" aria-expanded="${open}">
         ${avatar(p)}<span class="name">${esc(p.name)}${notes.length ? `<small>${notes.join(' · ')}</small>` : ''}</span>
-        ${nb ? `<span class="badge ${bonusPts > 0 ? 'ok' : bonusPts < 0 ? 'bad' : ''}">${signed(bonusPts)}</span>` : '<span class="badge">Ajouter</span>'}
+        ${nb || typed != null ? `<span class="badge ${bonusPts > 0 ? 'ok' : bonusPts < 0 ? 'bad' : ''}">${signed(bonusPts)}</span>` : '<span class="badge">Ajouter</span>'}
         <span class="chev" aria-hidden="true">${open ? '▴' : '▾'}</span></button>
       ${open ? `<div class="bonus-body">${rows}</div>` : ''}
     </div>`);
   }
   return `
-    <div class="section-title">Bonus</div>
+    <div class="section-head"><div class="section-title">Bonus</div>${bonusModeSwitch(g)}</div>
     ${cards.length ? `<p class="lede">Touchez un joueur pour compter les cartes de ses plis qui rapportent un bonus.</p>${cards.join('')}` : ''}
-    ${noTrick.length ? `<p class="lede small">Aucun pli, donc pas de bonus : ${noTrick.map((p) => esc(p.name)).join(', ')}.</p>` : ''}`;
+    ${noBonusNote(noTrick, [])}`;
 }
 
 const STATUS = {
@@ -683,6 +749,7 @@ function viewModal() {
     body = `<h2>Partie en cours</h2><div class="stack" style="gap:8px;margin-top:12px">
       <button class="btn btn-block" data-act="openScores">📜 Feuille de score</button>
       <button class="btn btn-block" data-act="rules">❓ Règles du décompte</button>
+      <button class="btn btn-block" data-act="theme">${window.mpTheme ? `${mpTheme.icon()} Thème : ${mpTheme.label()}` : 'Thème'}</button>
       <button class="btn btn-block" data-act="home">🏠 Accueil (la partie est conservée)</button>
       ${db.current && db.current.rounds.some((r) => r.done) ? '<button class="btn btn-block" data-act="askEndEarly">🏁 Terminer la partie maintenant</button>' : ''}
       <button class="btn btn-block btn-danger" data-act="askAbandon">Abandonner la partie</button>
@@ -754,6 +821,11 @@ const actions = {
   rules: () => { ui.modal = { type: 'rules', config: db.current && ui.screen !== 'home' ? db.current.config : (db.lastConfig ? R.normalizeConfig(db.lastConfig) : R.defaultConfig()) }; render(); },
   rulesSetup: () => { ui.modal = { type: 'rules', config: R.normalizeConfig(ui.setup.config) }; render(); },
   menu: () => { ui.modal = { type: 'menu' }; render(); },
+  theme: () => {
+    if (!window.mpTheme) return;
+    mpTheme.cycle();
+    toast(`Thème : ${mpTheme.label()}${mpTheme.get() === 'auto' ? ' (suit le téléphone)' : ''}`);
+  },
   closeModal: () => { ui.modal = null; render(); },
   backdrop: (d, el, e) => { if (e.target === el) { ui.modal = null; render(); } },
   askAbandon: () => { ui.modal = { type: 'confirm', title: 'Abandonner la partie ?', text: 'Les scores de cette partie seront effacés.', ok: 'abandon', okLabel: 'Abandonner' }; render(); },
@@ -776,6 +848,23 @@ const actions = {
   movePlayer: (d) => { const i = +d.i; const p = ui.setup.players; [p[i - 1], p[i]] = [p[i], p[i - 1]]; render(); },
   edition: (d) => { ui.setup.config = R.normalizeConfig({ ...ui.setup.config, edition: d.v }); render(); },
   scoring: (d) => { ui.setup.config = R.normalizeConfig({ ...ui.setup.config, scoring: d.v }); render(); },
+  bonusMode: (d) => { ui.setup.config.bonusMode = d.v; render(); },
+  switchBonusMode: (d) => {
+    const g = db.current;
+    g.config.bonusMode = d.v;
+    // Retour au comptage par cartes : on oublie les points tapés pour la manche en cours.
+    if (d.v === 'cards') ctx().round.free = {};
+    db.lastConfig = { ...db.lastConfig, bonusMode: d.v };
+    save();
+    render();
+    toast(d.v === 'points' ? 'Saisie directe des points de bonus' : 'Comptage des cartes bonus');
+  },
+  freeStep: (d) => {
+    const { game, round } = ctx();
+    const cur = R.freeBonus(round, d.p) ?? cardBonusRaw(game, round, d.p);
+    round.free[d.p] = cur + +d.d;
+    commit();
+  },
   schedule: (d) => { ui.setup.config.schedule = d.v; render(); },
   customAdd: () => { const c = ui.setup.config.custom; c.push(Math.min(20, (c.at(-1) || 0) + 1)); render(); },
   customDel: (d) => { const c = ui.setup.config.custom; if (c.length > 1) c.splice(+d.i, 1); render(); },
@@ -796,6 +885,7 @@ const actions = {
     const { round } = ctx();
     const b = (round.bonus[d.p] = round.bonus[d.p] || {});
     b[d.k] = Math.max(0, (b[d.k] || 0) + +d.d);
+    if (round.free) delete round.free[d.p];
     ui.open.add(d.p);
     commit();
   },
@@ -879,21 +969,29 @@ $app.addEventListener('change', (e) => {
     render();
     return;
   }
+  if (el.dataset.input === 'free') { render(); return; }
   if (el.dataset.change && changes[el.dataset.change]) changes[el.dataset.change](el.value, el);
 });
 $app.addEventListener('input', (e) => {
   const el = e.target;
   if (el.dataset.input === 'pname' && ui.setup) ui.setup.players[+el.dataset.i].name = el.value;
+  if (el.dataset.input === 'free') {
+    const { round } = ctx();
+    const v = el.value.trim().replace(',', '.');
+    if (v === '' || v === '-') delete round.free[el.dataset.p];
+    else if (Number.isFinite(+v)) round.free[el.dataset.p] = Math.round(+v);
+    if (ui.screen !== 'edit') save();
+  }
 });
 $app.addEventListener('keydown', (e) => {
   const el = e.target;
+  if (e.key === 'Enter' && el.dataset.input === 'free') { el.blur(); return; }
   if (e.key === 'Enter' && el.dataset.input === 'pname') {
     e.preventDefault();
     const i = +el.dataset.i;
     const next = $app.querySelector(`[data-input="pname"][data-i="${i + 1}"]`);
     if (next) next.focus();
-    else if (ui.setup.players.length < R.maxPlayers(ui.setup.config)) actions.addPlayer();
-    else el.blur();
+    else actions.addPlayer();
   }
 });
 document.addEventListener('keydown', (e) => {

@@ -9,9 +9,11 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/img/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+  <script src="assets/js/theme.js"></script>
   <link rel="stylesheet" href="assets/css/base.css">
   <style>
-    .hero { padding: 48px 0 28px; }
+    .hero { padding: 48px 0 28px; position: relative; }
+    .theme-btn { position: absolute; top: 16px; right: -6px; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 600; }
     .hero .logo { font-size: 44px; line-height: 1; }
     .hero h1 { font-size: 34px; margin-top: 14px; }
     .hero p { margin-top: 8px; font-size: 17px; }
@@ -39,6 +41,7 @@
 <body>
   <main class="wrap">
     <header class="hero">
+      <button class="theme-btn" id="theme-btn" type="button"></button>
       <div class="logo" aria-hidden="true">🎲</div>
       <h1>Marque-points</h1>
       <p class="muted">Choisissez un jeu, entrez les annonces et les résultats : le site applique les règles et fait les calculs.</p>
@@ -49,7 +52,7 @@
         <div class="art" aria-hidden="true">☠️</div>
         <div>
           <h2>Skull King</h2>
-          <p class="muted small">Jeu de plis et de paris pirates, de 2 à 8 joueurs.</p>
+          <p class="muted small">Jeu de plis et de paris pirates, dès 2 joueurs et sans limite.</p>
           <div class="tags">
             <span class="tag">Règles officielles</span>
             <span class="tag">Rascal</span>
@@ -70,12 +73,16 @@
       </div>
     </section>
   </main>
-  <footer class="muted tiny">Les parties sont enregistrées sur cet appareil, rien n’est envoyé en ligne.</footer>
+  <footer class="wrap muted tiny">Les parties sont enregistrées sur cet appareil, rien n’est envoyé en ligne.</footer>
   <script>
     try {
       const sk = JSON.parse(localStorage.getItem('marque-points:skull-king:v1') || 'null');
       if (sk && sk.current && !sk.current.finished) document.getElementById('sk-resume').hidden = false;
     } catch (e) { /* stockage indisponible */ }
+    const tb = document.getElementById('theme-btn');
+    const showTheme = () => { tb.textContent = `${mpTheme.icon()} ${mpTheme.label()}`; tb.setAttribute('aria-label', `Thème : ${mpTheme.label()}, toucher pour changer`); };
+    tb.addEventListener('click', () => { mpTheme.cycle(); showTheme(); });
+    showTheme();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   </script>
 </body>
