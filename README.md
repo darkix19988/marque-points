@@ -38,6 +38,7 @@ skull-king/app.js     interface
 depenses/money.js     calculs du partage des dépenses (sans DOM, testé)
 depenses/app.js       interface des dépenses
 assets/js/update.js   détection des mises à jour (bandeau « Mettre à jour »)
+assets/js/shell.js    fenêtre <dialog>, zone de messages, focus conservé
 sw.js                 cache hors ligne
 tests/                tests du décompte (node --test tests/)
 ```

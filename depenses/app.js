@@ -1,6 +1,7 @@
 // Dépenses de groupe — interface (un seul téléphone, données dans le navigateur)
 // Le numéro de version force le chargement de app.js et money.js ensemble après une mise à jour.
-import * as M from './money.js?v=8';
+import * as M from './money.js?v=9';
+import * as S from '../assets/js/shell.js?v=9';
 
 const KEY = 'marque-points:depenses:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
@@ -57,6 +58,10 @@ const themeButton = () => (window.mpTheme
   ? `<button class="icon-btn" data-act="theme" aria-label="Thème : ${mpTheme.label()}, toucher pour changer" title="Thème : ${mpTheme.label()}">${mpTheme.icon()}</button>`
   : '');
 
+// Fenêtre native et zone de messages, en dehors de #app.
+// Fermée par Échap, geste retour ou toucher à côté. Si la fenêtre a été rouverte entre-temps, on ignore.
+const shell = S.mountShell({ onClose: () => { if (ui.modal && !shell.dlg.open) { ui.modal = null; render(); } } });
+
 function toast(text, undo) {
   ui.toast = { text, undo };
   render();
@@ -69,6 +74,7 @@ function go(screen) {
   ui.modal = null;
   render();
   window.scrollTo(0, 0);
+  S.focusTitle();
 }
 
 // ---------- Accueil ----------
@@ -260,9 +266,9 @@ function viewGroup() {
       <button class="icon-btn" data-act="groupMenu" aria-label="Menu du groupe">⋯</button>
     </div></header>
     <main class="page"><div class="wrap stack">
-      <div class="tabs" role="tablist">
-        <button role="tab" class="${ui.tab === 'list' ? 'on' : ''}" aria-selected="${ui.tab === 'list'}" data-act="tab" data-v="list">Dépenses</button>
-        <button role="tab" class="${ui.tab === 'balance' ? 'on' : ''}" aria-selected="${ui.tab === 'balance'}" data-act="tab" data-v="balance">Qui doit quoi</button>
+      <div class="tabs" role="group" aria-label="Affichage">
+        <button class="${ui.tab === 'list' ? 'on' : ''}" aria-pressed="${ui.tab === 'list'}" data-act="tab" data-v="list">Dépenses</button>
+        <button class="${ui.tab === 'balance' ? 'on' : ''}" aria-pressed="${ui.tab === 'balance'}" data-act="tab" data-v="balance">Qui doit quoi</button>
       </div>
       ${ui.tab === 'list' ? viewList(g) : viewBalance(g)}
     </div></main>
@@ -379,7 +385,7 @@ function viewItem() {
       <div class="section-title">Payé par</div>${nameChips(g, 'payer', d.payer, false)}
       <div class="section-head"><div class="section-title">Pour qui</div>
         ${d.split.mode === 'equal' ? `<button class="btn btn-small" data-act="toggleAll">${d.split.ids.length === g.people.length ? 'Personne' : 'Tout le monde'}</button>` : ''}</div>
-      <div class="tabs small-tabs" role="tablist">${modes.map(([v, l]) => `<button role="tab" class="${d.split.mode === v ? 'on' : ''}" data-act="splitMode" data-v="${v}">${l}</button>`).join('')}</div>
+      <div class="tabs small-tabs" role="group" aria-label="Répartition">${modes.map(([v, l]) => `<button class="${d.split.mode === v ? 'on' : ''}" aria-pressed="${d.split.mode === v}" data-act="splitMode" data-v="${v}">${l}</button>`).join('')}</div>
       <div class="card list-card" id="split-zone">${splitRows(g, d)}</div>
       <div class="section-title">Date</div>
       <input class="field" type="date" value="${esc(d.date)}" data-change="date" aria-label="Date">`;
@@ -497,7 +503,7 @@ function viewModal() {
   let body = '';
   const m = ui.modal;
   if (m.type === 'groupMenu') {
-    body = `<h2>${esc(group().name)}</h2><div class="stack" style="gap:8px;margin-top:12px">
+    body = `<h2 id="dlg-title">${esc(group().name)}</h2><div class="stack" style="gap:8px;margin-top:12px">
       <button class="btn btn-block" data-act="editGroup">✏️ Modifier le groupe et les participants</button>
       <button class="btn btn-block" data-act="share">📤 Partager le résumé</button>
       <button class="btn btn-block" data-act="exportGroup">💾 Exporter (fichier pour un autre téléphone)</button>
@@ -506,15 +512,15 @@ function viewModal() {
       <button class="btn btn-block btn-danger" data-act="askDeleteGroup">Supprimer le groupe</button>
       <button class="btn btn-block btn-ghost" data-act="closeModal">Fermer</button></div>`;
   } else if (m.type === 'confirm') {
-    body = `<h2>${m.title}</h2><p class="muted">${m.text}</p>
-      <div class="actions"><button class="btn" data-act="closeModal">Annuler</button>
+    body = `<h2 id="dlg-title">${m.title}</h2><p class="muted">${m.text}</p>
+      <div class="actions"><button class="btn" data-act="closeModal" autofocus>Annuler</button>
       <button class="btn btn-primary" data-act="${m.ok}">${m.okLabel}</button></div>`;
   } else if (m.type === 'text') {
-    body = `<h2>${esc(m.title)}</h2><p class="muted small">Copiez ce texte pour l’envoyer :</p>
+    body = `<h2 id="dlg-title">${esc(m.title)}</h2><p class="muted small">Copiez ce texte pour l’envoyer :</p>
       <textarea class="field" rows="12" readonly style="width:100%;font-size:14px">${esc(m.text)}</textarea>
       <div class="actions"><button class="btn btn-primary" data-act="closeModal">Fermer</button></div>`;
   }
-  return `<div class="modal-back" data-act="backdrop"><div class="modal" role="dialog" aria-modal="true">${body}</div></div>`;
+  return body;
 }
 
 // ---------- Rendu ----------
@@ -527,9 +533,13 @@ function renderScreen() {
     default: html = viewHome();
   }
   const t = ui.toast;
-  $app.innerHTML = html + viewModal()
-    + (t ? `<div class="toast" role="status">${esc(t.text)}${t.undo ? ' <button class="toast-btn" data-act="undo">Annuler</button>' : ''}</div>` : '');
-  document.body.style.overflow = ui.modal ? 'hidden' : '';
+  const focus = S.focusKey();
+  $app.innerHTML = html;
+  S.syncDialog(shell.dlg, viewModal());
+  // Pas de message pendant qu'une fenêtre est ouverte : la page derrière est inerte.
+  S.syncToast(shell.live, t && !ui.modal
+    ? `<div class="toast">${esc(t.text)}${t.undo ? ' <button class="toast-btn" data-act="undo">Annuler</button>' : ''}</div>` : '');
+  S.restoreFocus(focus);
   if (ui.screen === 'item') liveUpdate();
 }
 
@@ -539,6 +549,7 @@ function render() {
   } catch (err) {
     console.error(err);
     ui.modal = null;
+    S.syncDialog(shell.dlg, '');
     $app.innerHTML = `<main class="page no-bar"><div class="wrap stack" style="padding-top:40px">
       <div class="card stack"><h2>Oups, l’affichage a planté</h2>
       <p class="muted">Souvent juste après une mise à jour du site. Vos groupes sont sauvegardés : rechargez la page.</p>
@@ -570,7 +581,6 @@ const actions = {
   tab: (d) => { ui.tab = d.v; render(); },
   groupMenu: () => { ui.modal = { type: 'groupMenu' }; render(); },
   closeModal: () => { ui.modal = null; render(); },
-  backdrop: (d, el, e) => { if (e.target === el) { ui.modal = null; render(); } },
   editGroup: () => startGroupDraft(group()),
   exportGroup: () => exportGroup(),
   share: () => { ui.modal = null; render(); shareSummary(); },
@@ -659,7 +669,8 @@ const changes = {
   importFile: (v, el) => { importFile(el.files && el.files[0]); el.value = ''; },
 };
 
-$app.addEventListener('click', (e) => {
+// Clics écoutés sur tout le document : la fenêtre <dialog> et les messages sont en dehors de #app.
+document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.act];
@@ -693,7 +704,7 @@ $app.addEventListener('input', (e) => {
 });
 $app.addEventListener('keydown', (e) => {
   const el = e.target;
-  if (e.key !== 'Enter') return;
+  if (e.key !== 'Enter' || S.isComposing(e)) return; // Entrée qui valide un caractère japonais, chinois…
   if (el.dataset.input === 'pname') {
     e.preventDefault();
     const next = $app.querySelector(`[data-input="pname"][data-i="${+el.dataset.i + 1}"]`);
@@ -703,9 +714,6 @@ $app.addEventListener('keydown', (e) => {
     e.preventDefault();
     el.blur();
   }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && ui.modal) { ui.modal = null; render(); }
 });
 
 /** Barre du bas de l'écran groupe, mise à jour pendant la frappe sans perdre le clavier. */

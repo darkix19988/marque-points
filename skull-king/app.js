@@ -1,6 +1,7 @@
 // Skull King — interface du compteur de points
 // Le numéro de version force le chargement de app.js et rules.js ensemble après une mise à jour.
-import * as R from './rules.js?v=8';
+import * as R from './rules.js?v=9';
+import * as S from '../assets/js/shell.js?v=9';
 
 const KEY = 'marque-points:skull-king:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
@@ -51,6 +52,10 @@ const avatar = (p) => `<span class="avatar" style="--c:${p.color}" aria-hidden="
 const plural = (n, one, many) => `${fmt(n)} ${Math.abs(n) > 1 ? many : one}`;
 const dateFr = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
+// Fenêtre native et zone de messages, en dehors de #app.
+// Fermée par Échap, geste retour ou toucher à côté. Si la fenêtre a été rouverte entre-temps, on ignore.
+const shell = S.mountShell({ onClose: () => { if (ui.modal && !shell.dlg.open) { ui.modal = null; render(); } } });
+
 function toast(text) {
   ui.toast = text;
   render();
@@ -63,6 +68,7 @@ function go(screen) {
   ui.modal = null;
   render();
   window.scrollTo(0, 0);
+  S.focusTitle();
 }
 
 /** Manche en cours d'édition : la manche courante ou une copie d'une manche passée. */
@@ -709,7 +715,7 @@ function rulesHtml(c) {
         <li>Les bonus ne comptent que si l’annonce est juste.</li>
       </ul>`;
   return `
-    <h2>Règles du décompte</h2>
+    <h2 id="dlg-title">Règles du décompte</h2>
     <p class="muted small">${R.EDITIONS[c.edition].label} · ${R.EDITIONS[c.edition].sub}</p>
     ${scoring}
     <h3>Bonus</h3><ul>
@@ -740,7 +746,7 @@ function viewModal() {
   if (ui.modal.type === 'rules') {
     body = `${rulesHtml(ui.modal.config)}<div class="actions"><button class="btn btn-primary" data-act="closeModal">Compris</button></div>`;
   } else if (ui.modal.type === 'menu') {
-    body = `<h2>Partie en cours</h2><div class="stack" style="gap:8px;margin-top:12px">
+    body = `<h2 id="dlg-title">Partie en cours</h2><div class="stack" style="gap:8px;margin-top:12px">
       <button class="btn btn-block" data-act="openScores">📜 Feuille de score</button>
       <button class="btn btn-block" data-act="rules">❓ Règles du décompte</button>
       <button class="btn btn-block" data-act="theme">${window.mpTheme ? `${mpTheme.icon()} Thème : ${mpTheme.label()}` : 'Thème'}</button>
@@ -750,11 +756,11 @@ function viewModal() {
       <button class="btn btn-block btn-danger" data-act="askAbandon">Abandonner la partie</button>
       <button class="btn btn-block btn-ghost" data-act="closeModal">Fermer</button></div>`;
   } else if (ui.modal.type === 'confirm') {
-    body = `<h2>${ui.modal.title}</h2><p class="muted">${ui.modal.text}</p>
-      <div class="actions"><button class="btn" data-act="closeModal">Annuler</button>
+    body = `<h2 id="dlg-title">${ui.modal.title}</h2><p class="muted">${ui.modal.text}</p>
+      <div class="actions"><button class="btn" data-act="closeModal" autofocus>Annuler</button>
       <button class="btn btn-primary" data-act="${ui.modal.ok}" ${ui.modal.id ? `data-id="${ui.modal.id}"` : ''}>${ui.modal.okLabel}</button></div>`;
   }
-  return `<div class="modal-back" data-act="backdrop"><div class="modal" role="dialog" aria-modal="true">${body}</div></div>`;
+  return body;
 }
 
 // ---------- Rendu ----------
@@ -765,6 +771,7 @@ function render() {
     // Ne jamais laisser l'écran figé : on explique et on propose de recharger (la partie est sauvegardée).
     console.error(err);
     ui.modal = null;
+    S.syncDialog(shell.dlg, '');
     $app.innerHTML = `<main class="page no-bar"><div class="wrap stack" style="padding-top:40px">
       <div class="card stack"><h2>Oups, l’affichage a planté</h2>
       <p class="muted">Souvent juste après une mise à jour du site. Votre partie est sauvegardée : rechargez la page.</p>
@@ -784,8 +791,12 @@ function renderScreen() {
     case 'past': html = viewEnd(ui.past, true); break;
     default: html = viewHome();
   }
-  $app.innerHTML = html + viewModal() + (ui.toast ? `<div class="toast" role="status">${esc(ui.toast)}</div>` : '');
-  document.body.style.overflow = ui.modal ? 'hidden' : '';
+  const focus = S.focusKey();
+  $app.innerHTML = html;
+  S.syncDialog(shell.dlg, viewModal());
+  // Pas de message pendant qu'une fenêtre est ouverte : la page derrière est inerte.
+  S.syncToast(shell.live, ui.toast && !ui.modal ? `<div class="toast">${esc(ui.toast)}</div>` : '');
+  S.restoreFocus(focus);
   syncWakeLock();
 }
 
@@ -839,7 +850,6 @@ const actions = {
     toast(`Thème : ${mpTheme.label()}${mpTheme.get() === 'auto' ? ' (suit le téléphone)' : ''}`);
   },
   closeModal: () => { ui.modal = null; render(); },
-  backdrop: (d, el, e) => { if (e.target === el) { ui.modal = null; render(); } },
   askAbandon: () => { ui.modal = { type: 'confirm', title: 'Abandonner la partie ?', text: 'Les scores de cette partie seront effacés.', ok: 'abandon', okLabel: 'Abandonner' }; render(); },
   abandon: () => { db.current = null; save(); go('home'); },
   resetCurrent: () => {
@@ -970,7 +980,8 @@ function focusLastName() {
   if (inputs.length) inputs[inputs.length - 1].focus();
 }
 
-$app.addEventListener('click', (e) => {
+// Clics écoutés sur tout le document : la fenêtre <dialog> est en dehors de #app.
+document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.act];
@@ -1003,6 +1014,7 @@ $app.addEventListener('input', (e) => {
 });
 $app.addEventListener('keydown', (e) => {
   const el = e.target;
+  if (e.key === 'Enter' && S.isComposing(e)) return; // Entrée qui valide un caractère japonais, chinois…
   if (e.key === 'Enter' && el.dataset.input === 'free') { el.blur(); return; }
   if (e.key === 'Enter' && el.dataset.input === 'pname') {
     e.preventDefault();
@@ -1011,9 +1023,6 @@ $app.addEventListener('keydown', (e) => {
     if (next) next.focus();
     else actions.addPlayer();
   }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && ui.modal) { ui.modal = null; render(); }
 });
 window.addEventListener('storage', (e) => { if (e.key === KEY) { db = load(); render(); } });
 
