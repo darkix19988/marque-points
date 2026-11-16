@@ -1,6 +1,6 @@
 // Dépenses de groupe — interface (un seul téléphone, données dans le navigateur)
 // Le numéro de version force le chargement de app.js et money.js ensemble après une mise à jour.
-import * as M from './money.js?v=6';
+import * as M from './money.js?v=7';
 
 const KEY = 'marque-points:depenses:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
@@ -51,6 +51,8 @@ const dateLabel = (d) => {
   if (d === y) return 'Hier';
   return new Date(`${d}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 };
+/** Largeur du champ montant ajustée au nombre tapé, pour garder le symbole € collé. */
+const amountWidth = (txt) => `${Math.max(1.4, Math.min(9, String(txt || '').length + 0.4))}ch`;
 const themeButton = () => (window.mpTheme
   ? `<button class="icon-btn" data-act="theme" aria-label="Thème : ${mpTheme.label()}, toucher pour changer" title="Thème : ${mpTheme.label()}">${mpTheme.icon()}</button>`
   : '');
@@ -90,13 +92,12 @@ function viewHome() {
     </div></header>
     <main class="page no-bar"><div class="wrap stack">
       <div class="sk-hero"><div class="skull" aria-hidden="true">💸</div><h1>Qui doit quoi ?</h1>
-        <p class="muted">Notez qui a payé quoi pendant le week-end, la coloc ou la soirée : le site calcule qui rembourse qui, avec le moins de virements possible.</p></div>
+        <p class="muted">Notez qui a payé quoi, le site calcule qui rembourse qui.</p></div>
       ${list ? `<div class="section-title">Vos groupes</div>${list}` : ''}
       <button class="btn btn-primary btn-lg btn-block" data-act="newGroup">+ Nouveau groupe</button>
-      <label class="btn btn-ghost btn-block">Importer un groupe (fichier .json)
+      <label class="btn btn-ghost btn-block">Importer un groupe
         <input type="file" accept="application/json,.json" data-change="importFile" hidden></label>
-      <p class="tiny muted" style="text-align:center">Tout reste sur ce téléphone. Pour changer d’appareil, exportez le groupe depuis son menu ⋯.</p>
-      <button class="btn btn-ghost btn-small" data-act="reloadApp" style="justify-self:center">🔄 Recharger l’application</button>
+      <p class="tiny muted" style="text-align:center">Tout reste sur ce téléphone.</p>
     </div></main>`;
 }
 
@@ -212,8 +213,8 @@ function viewList(g) {
       const n = Object.keys(shares).length;
       const forWho = n === g.people.length ? 'tout le monde' : n === 1 ? esc(person(g, Object.keys(shares)[0]).name) : `${n} personnes`;
       html += `<button class="item-row" data-act="editItem" data-id="${it.id}">
-        <span class="cat" aria-hidden="true">${M.categoryOf(it.category).icon}</span>
-        <span class="grow"><b>${esc(it.title || M.categoryOf(it.category).label)}</b><span class="muted small">Payé par ${esc(person(g, it.payer).name)} · pour ${forWho}</span></span>
+        <span class="cat" aria-hidden="true">${it.category ? M.categoryOf(it.category).icon : '🧾'}</span>
+        <span class="grow"><b>${esc(it.title || 'Dépense')}</b><span class="muted small">Payé par ${esc(person(g, it.payer).name)} · pour ${forWho}</span></span>
         <span class="amt">${money(it.amount)}</span></button>`;
     }
   }
@@ -241,11 +242,9 @@ function viewBalance(g) {
   return `
     <div class="section-title">Soldes</div>
     <div class="card list-card">${rows}</div>
-    <p class="tiny muted" style="padding:0 4px">En vert, on lui doit de l’argent. En rouge, il ou elle en doit.</p>
     <div class="section-title">Remboursements à faire</div>
     ${moves.length
-      ? `<div class="card list-card">${moveRows}</div>
-         <p class="tiny muted" style="padding:0 4px">Le moins de virements possible. Touchez « Fait » quand l’argent a été rendu.</p>`
+      ? `<div class="card list-card">${moveRows}</div>`
       : '<div class="empty small-empty"><div class="big" aria-hidden="true">✅</div><b>Tout le monde est quitte</b></div>'}
     <button class="btn btn-block" data-act="share">📤 Partager le résumé</button>`;
 }
@@ -279,7 +278,7 @@ function newDraft(type, preset = {}) {
   const g = group();
   const ids = g.people.map((p) => p.id);
   ui.draft = {
-    id: null, type, title: '', amount: null, amountText: '', payer: null, to: null, date: today(), category: 'other',
+    id: null, type, title: '', amount: null, amountText: '', payer: null, to: null, date: today(),
     split: { mode: 'equal', ids: ids.slice(), shares: Object.fromEntries(ids.map((id) => [id, 1])), amounts: {}, amountTexts: {} },
     ...preset,
   };
@@ -317,7 +316,7 @@ function draftToItem(d) {
   if (s.mode === 'exact') split = { mode: 'exact', amounts: Object.fromEntries(Object.entries(s.amounts).filter(([, v]) => v > 0)) };
   else if (s.mode === 'shares') split = { mode: 'shares', shares: Object.fromEntries(Object.entries(s.shares).filter(([, v]) => v > 0)) };
   else split = { mode: 'equal', ids: s.ids.slice() };
-  return { ...base, category: d.category, split };
+  return { ...base, ...(d.category ? { category: d.category } : {}), split };
 }
 
 function nameChips(g, act, selected, multi) {
@@ -364,7 +363,7 @@ function viewItem() {
     </div></header>`;
   const amount = `
     <label class="amount-box"><span class="sr">Montant</span>
-      <input class="amount-input" type="text" inputmode="decimal" value="${esc(d.amountText)}" placeholder="0" data-input="amount" autocomplete="off" aria-label="Montant">
+      <input class="amount-input" type="text" inputmode="decimal" value="${esc(d.amountText)}" placeholder="0" data-input="amount" autocomplete="off" aria-label="Montant" style="width:${amountWidth(d.amountText)}">
       <span class="cur">${esc(symbol)}</span></label>`;
   let body;
   if (isTransfer) {
@@ -377,13 +376,11 @@ function viewItem() {
     const modes = [['equal', 'Parts égales'], ['shares', 'Par parts'], ['exact', 'Montants']];
     body = `${amount}
       <input class="field" type="text" value="${esc(d.title)}" placeholder="Courses, resto, essence…" data-input="title" maxlength="50" aria-label="Description">
-      <div class="tags cats" role="group" aria-label="Catégorie">${M.CATEGORIES.map((c) => `<button class="chip name-chip ${d.category === c.id ? 'on' : ''}" data-act="category" data-v="${c.id}" aria-pressed="${d.category === c.id}">${c.icon} ${c.label}</button>`).join('')}</div>
       <div class="section-title">Payé par</div>${nameChips(g, 'payer', d.payer, false)}
       <div class="section-head"><div class="section-title">Pour qui</div>
         ${d.split.mode === 'equal' ? `<button class="btn btn-small" data-act="toggleAll">${d.split.ids.length === g.people.length ? 'Personne' : 'Tout le monde'}</button>` : ''}</div>
       <div class="tabs small-tabs" role="tablist">${modes.map(([v, l]) => `<button role="tab" class="${d.split.mode === v ? 'on' : ''}" data-act="splitMode" data-v="${v}">${l}</button>`).join('')}</div>
       <div class="card list-card" id="split-zone">${splitRows(g, d)}</div>
-      ${d.split.mode === 'shares' ? '<p class="tiny muted" style="padding:0 4px">Exemple : un couple compte pour 2 parts, un enfant pour 1.</p>' : ''}
       <div class="section-title">Date</div>
       <input class="field" type="date" value="${esc(d.date)}" data-change="date" aria-label="Date">`;
   }
@@ -682,6 +679,7 @@ $app.addEventListener('input', (e) => {
   if (k === 'title') ui.draft.title = el.value;
   if (k === 'amount') {
     ui.draft.amountText = el.value;
+    el.style.width = amountWidth(el.value);
     ui.draft.amount = M.parseAmount(el.value);
     liveUpdate();
   }

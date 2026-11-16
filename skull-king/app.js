@@ -1,6 +1,6 @@
 // Skull King — interface du compteur de points
 // Le numéro de version force le chargement de app.js et rules.js ensemble après une mise à jour.
-import * as R from './rules.js?v=6';
+import * as R from './rules.js?v=7';
 
 const KEY = 'marque-points:skull-king:v1';
 const COLORS = ['#d9480f', '#1c7ed6', '#2b8a3e', '#ae3ec9', '#e8590c', '#0c8599', '#c2255c', '#5f3dc4', '#868e96', '#a07800', '#364fc7', '#087f5b'];
@@ -121,11 +121,10 @@ function viewHome() {
       <div class="sk-hero">
         <div class="skull" aria-hidden="true">☠️</div>
         <h1>Skull King</h1>
-        <p class="muted">Entrez les annonces puis les plis : les points et les bonus sont calculés selon la règle officielle.</p>
+        <p class="muted">Annonces, plis, bonus : le calcul est automatique.</p>
       </div>
       ${resume}
       <button class="btn ${g ? '' : 'btn-primary'} btn-lg btn-block" data-act="newGame">${g ? 'Nouvelle partie' : 'Commencer une partie'}</button>
-      <button class="btn btn-ghost btn-small" data-act="reloadApp" style="justify-self:center">🔄 Recharger l’application</button>
       ${histHtml}
     </div></main>`;
 }
@@ -138,13 +137,29 @@ function startSetup(from) {
   go('setup');
 }
 
-function choice(act, value, current, title, sub) {
-  return `<button class="choice ${value === current ? 'on' : ''}" data-act="${act}" data-v="${value}" aria-pressed="${value === current}">
-    <span class="radio" aria-hidden="true"></span><span><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</span></button>`;
+function seg(act, options, current) {
+  return `<div class="tabs" role="group">${options.map(([v, l]) =>
+    `<button class="${v === current ? 'on' : ''}" data-act="${act}" data-v="${v}" aria-pressed="${v === current}">${l}</button>`).join('')}</div>`;
 }
-function toggle(key, on, title, sub) {
-  return `<label class="switch"><span class="txt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</span>
+function toggle(key, on, title) {
+  return `<label class="switch"><span class="txt"><b>${title}</b></span>
     <input type="checkbox" data-cfg="${key}" ${on ? 'checked' : ''}></label>`;
+}
+
+/** Résumé des règles choisies, affiché quand le panneau est replié. */
+function rulesSummary(c, nRounds) {
+  const parts = [c.edition === 'old' ? 'Ancienne édition' : 'Édition actuelle'];
+  parts.push(c.scoring === 'rascal' ? `Rascal${c.cannonball ? ' + boulet' : ''}` : 'Décompte classique');
+  parts.push(plural(nRounds, 'manche', 'manches'));
+  if (c.bonusMode === 'points') parts.push('bonus saisis');
+  const extras = [];
+  if (c.kraken) extras.push('Kraken');
+  if (c.whale) extras.push('Baleine');
+  if (c.loot) extras.push('Butin');
+  if (c.abilities) extras.push('Pouvoirs');
+  if (c.pack) extras.push('Expansion Pack');
+  if (extras.length) parts.push(extras.join(', '));
+  return parts.join(' · ');
 }
 
 function viewSetup() {
@@ -156,9 +171,7 @@ function viewSetup() {
   const sched = R.scheduleRounds(c);
   const rounds = R.roundsFor(c, Math.max(2, n));
   const capped = rounds.some((k, i) => k !== sched[i]);
-  const issues = [];
-  if (n < 2) issues.push('Il faut au moins 2 joueurs.');
-
+  const issue = n < 2 ? 'Il faut au moins 2 joueurs.' : '';
 
   const players = s.players.map((p, i) => `
     <div class="player-row">
@@ -168,88 +181,70 @@ function viewSetup() {
       <button class="icon-btn" data-act="delPlayer" data-i="${i}" aria-label="Retirer">✕</button>
     </div>`).join('');
 
+  const notes = [];
+  if (n > advised) notes.push(`Plus de ${advised} joueurs : les cartes par manche sont plafonnées pour que chacun en ait autant.`);
+  if (n === 2 && isNew) notes.push('À 2, distribuez aussi une main au fantôme de Barbe-Grise (il joue en 2e, sans score).');
+
   const custom = c.schedule === 'custom' ? `
     <div class="custom-rounds">
       ${c.custom.map((k, i) => `<span class="custom-round"><small>M${i + 1}</small>
         <button data-act="customStep" data-i="${i}" data-d="-1" aria-label="Moins de cartes">−</button><b>${k}</b>
         <button data-act="customStep" data-i="${i}" data-d="1" aria-label="Plus de cartes">+</button>
         <button data-act="customDel" data-i="${i}" aria-label="Supprimer la manche">✕</button></span>`).join('')}
-      <button class="btn" data-act="customAdd" style="min-height:36px;padding:4px 14px">+ Manche</button>
+      <button class="btn btn-small" data-act="customAdd">+ Manche</button>
     </div>` : '';
+
+  const rules = s.showRules ? `
+    <div class="card stack rules-panel">
+      <div><div class="field-label">Édition</div>${seg('edition', [['new', 'Actuelle'], ['old', 'Ancienne']], c.edition)}</div>
+      <div><div class="field-label">Décompte</div>${seg('scoring', [['skull', 'Classique'], ['rascal', 'Rascal']], c.scoring)}
+        <p class="hint">${c.scoring === 'rascal' ? '10 pts par carte : tout si l’annonce est juste, la moitié à 1 près.' : '+20 par pli si l’annonce est juste, −10 par pli d’écart sinon.'}</p>
+        ${c.scoring === 'rascal' ? toggle('cannonball', c.cannonball, 'Option boulet de canon') : ''}</div>
+      <div><div class="field-label">Bonus</div>${seg('bonusMode', [['cards', 'Compter les cartes'], ['points', 'Taper le score']], c.bonusMode)}</div>
+      <div><div class="field-label">Manches</div>
+        <select class="select" data-change="schedule" aria-label="Manches">
+          ${R.SCHEDULES.map((x) => `<option value="${x.id}" ${x.id === c.schedule ? 'selected' : ''}>${x.label}</option>`).join('')}
+        </select>
+        <p class="hint">${(R.SCHEDULES.find((x) => x.id === c.schedule) || R.SCHEDULES[0]).sub}</p>${custom}
+        ${capped ? `<p class="hint warn">Pas assez de cartes pour tous : ${rounds.join(', ')} cartes.</p>` : ''}</div>
+      ${isNew ? `<div><div class="field-label">Cartes en plus</div>
+        ${toggle('kraken', c.kraken, '🐙 Kraken')}
+        ${toggle('whale', c.whale, '🐋 Baleine blanche')}
+        ${toggle('loot', c.loot, '💰 Butin')}
+        ${toggle('abilities', c.abilities, '🦜 Pouvoirs des pirates')}
+        ${toggle('pack', c.pack, '🧭 Expansion Pack')}
+        ${c.pack ? `<div class="sub-options">
+          ${toggle('packCon', c.packCon, 'First Mate Con')}
+          ${toggle('packDavy', c.packDavy, 'Coffre de Davy Jones')}
+          ${toggle('packStingray', c.packStingray, 'Raie tachetée')}
+          ${toggle('packPlank', c.packPlank, 'La Planche')}
+          ${toggle('packVolley', c.packVolley, 'Dernière salve')}
+        </div>` : ''}</div>` : ''}
+    </div>` : `
+    <button class="card rules-summary" data-act="toggleRules">
+      <span class="grow">${rulesSummary(c, rounds.length)}</span><span class="link">Modifier</span>
+    </button>`;
 
   return `
     <header class="topbar"><div class="wrap">
       <button class="icon-btn" data-act="home" aria-label="Retour">‹</button>
-      <div class="title"><strong>Nouvelle partie</strong><span>Joueurs et règles</span></div>
-      ${themeButton()}
+      <div class="title"><strong>Nouvelle partie</strong></div>
       <button class="icon-btn" data-act="rulesSetup" aria-label="Règles du décompte">?</button>
     </div></header>
     <main class="page"><div class="wrap stack">
-      <div class="section-title">Équipage</div>
+      <div class="section-head"><div class="section-title">Joueurs</div><span class="tiny muted">dans l’ordre du tour de table</span></div>
       <div class="card stack" style="gap:8px">
-        <p class="muted small">Dans l’ordre du tour de table : le joueur 1 distribue la première manche.</p>
         ${players}
         <button class="btn" data-act="addPlayer">+ Ajouter un joueur</button>
-        ${n > advised ? `<p class="small" style="color:var(--warn)">La règle conseille ${advised} joueurs au maximum avec ces cartes. Pas de souci pour jouer à ${n} : le nombre de cartes par manche est plafonné pour que tout le monde en ait autant.</p>` : ''}
-        ${n === 2 && isNew ? '<p class="small muted">À 2 joueurs, on distribue une 3e main au fantôme de Barbe-Grise : il joue toujours en 2e position et n’a pas de score.</p>' : ''}
+        ${notes.map((t) => `<p class="hint">${t}</p>`).join('')}
       </div>
-
-      <div class="section-title">Édition du jeu</div>
-      <div class="choices two">
-        ${choice('edition', 'new', c.edition, R.EDITIONS.new.label, R.EDITIONS.new.sub)}
-        ${choice('edition', 'old', c.edition, R.EDITIONS.old.label, R.EDITIONS.old.sub)}
-      </div>
-
-      <div class="section-title">Décompte des points</div>
-      <div class="choices">
-        ${choice('scoring', 'skull', c.scoring, 'Décompte du Skull King', 'Le classique : +20 par pli si l’annonce est juste, −10 par pli d’écart sinon. Annonce zéro : ±10 par carte.')}
-        ${choice('scoring', 'rascal', c.scoring, 'Décompte de Rascal', 'Tout le monde vise 10 points par carte. Pile : tout. Écart de 1 : la moitié. Plus : rien.')}
-      </div>
-      ${c.scoring === 'rascal' ? `<div class="card">${toggle('cannonball', c.cannonball, 'Mitraille ou boulet de canon', 'Après les annonces, chacun choisit : main ouverte (Rascal normal) ou poing fermé (15 par carte si l’annonce est juste, 0 sinon).')}</div>` : ''}
-
-      ${isNew ? `
-      <div class="section-title">Règles avancées</div>
-      <div class="card">
-        ${toggle('kraken', c.kraken, '🐙 Kraken', 'Détruit le pli : personne ne le remporte.')}
-        ${toggle('whale', c.whale, '🐋 Baleine blanche', 'Les cartes spéciales sont détruites, le plus grand chiffre gagne.')}
-        ${toggle('loot', c.loot, '💰 Butin (2 cartes)', 'Alliance avec le gagnant du pli : +20 chacun si les deux réussissent.')}
-        ${toggle('abilities', c.abilities, '🦜 Pouvoirs des pirates', 'Seuls Harry le Géant (annonce ±1) et Rascal of Roatan (pari 0/10/20) changent les points.')}
-      </div>
-
-      <div class="section-title">Extension</div>
-      <div class="card">
-        ${toggle('pack', c.pack, '🧭 Skull King : Expansion Pack', '7, 8 et 0/14 de chaque couleur, Wild 15 et Mary Thorne. Les 8 valent +5, les 7 −5. Jusqu’à 9 joueurs sur 10 manches.')}
-        ${c.pack ? `<div class="sub-options">
-          ${toggle('packCon', c.packCon, 'First Mate Con', 'Bat les pirates. Capturé par le Skull King ou une Sirène : +30.')}
-          ${toggle('packDavy', c.packDavy, 'Coffre de Davy Jones', 'Détruit les monstres marins : +20 par monstre.')}
-          ${toggle('packStingray', c.packStingray, 'Raie tachetée', 'Comme la Baleine, mais la plus petite carte gagne.')}
-          ${toggle('packPlank', c.packPlank, 'La Planche', 'Retire un pirate du pli.')}
-          ${toggle('packVolley', c.packVolley, 'Dernière salve', 'Le joueur rejoue une carte et passe le dernier pli.')}
-        </div>` : ''}
-      </div>` : ''}
-
-      <div class="section-title">Saisie des bonus</div>
-      <div class="choices two">
-        ${choice('bonusMode', 'cards', c.bonusMode, 'Compter les cartes', 'On indique les 14, pirates, sirènes… capturés : le site calcule.')}
-        ${choice('bonusMode', 'points', c.bonusMode, 'Saisir le score', 'Plus rapide pour les habitués : on tape directement les points de bonus.')}
-      </div>
-
-      <div class="section-title">Manches</div>
-      <div class="choices">
-        ${R.SCHEDULES.map((x) => choice('schedule', x.id, c.schedule, x.label, x.sub)).join('')}
-      </div>
-      ${custom}
-
-      <div class="card summary">
-        <b>${plural(rounds.length, 'manche', 'manches')} · cartes par joueur</b>
-        <div class="round-strip">${rounds.map((k, i) => `<span class="${k !== sched[i] ? 'capped' : ''}">${k}</span>`).join('')}</div>
-        <p class="small muted">Paquet de ${R.deckSize(c, Math.max(2, n))} cartes${n === 2 && isNew ? ' pour 3 mains' : ''}.
-        ${capped ? ' Il n’y a pas assez de cartes pour tout le monde : les dernières manches répètent le nombre maximal de cartes (règle officielle).' : ''}</p>
-      </div>
+      <div class="section-head"><div class="section-title">Règles</div>
+        ${s.showRules ? '<button class="btn btn-small" data-act="toggleRules">Fermer</button>' : ''}</div>
+      ${rules}
     </div></main>
     <div class="bar"><div class="wrap">
-      <div class="info">${issues.length ? `<span class="neg">${issues.join(' ')}</span>` : `<b>${n} joueurs</b><br><span class="muted">${R.EDITIONS[c.edition].label} · ${c.scoring === 'rascal' ? 'Rascal' : 'Skull King'}</span>`}</div>
-      <button class="btn btn-primary btn-lg" data-act="startGame" ${issues.length ? 'disabled' : ''}>Lever l’ancre</button>
+      <div class="info">${issue ? `<span class="neg">${issue}</span>` : `<b>${n} joueurs</b>`}</div>
+      <button class="btn btn-primary btn-lg" data-act="startGame" ${issue ? 'disabled' : ''}>Commencer</button>
     </div></div>`;
 }
 
@@ -330,8 +325,7 @@ function bidTotalInfo(g, round) {
   const total = vals.reduce((a, b) => a + b, 0);
   const missing = g.players.length - vals.length;
   if (missing) return `<b>${missing} annonce${missing > 1 ? 's' : ''} à saisir</b><br><span class="muted">Total : ${total} pour ${round.cards} pli${round.cards > 1 ? 's' : ''}</span>`;
-  const mood = total > round.cards ? 'Ça va se battre !' : total < round.cards ? 'Des plis vont rester sans preneur…' : 'Pile le nombre de plis.';
-  return `<b>${total} annoncé${total > 1 ? 's' : ''} pour ${round.cards} pli${round.cards > 1 ? 's' : ''}</b><br><span class="muted">${mood}</span>`;
+  return `<b>${total} annoncé${total > 1 ? 's' : ''}</b> <span class="muted">pour ${round.cards} pli${round.cards > 1 ? 's' : ''}</span>`;
 }
 
 function playerSelect(g, act, value, extra = '', none = 'Personne') {
@@ -352,13 +346,13 @@ function viewAbilities(g, round) {
     <div class="section-title">Pouvoirs des pirates</div>
     <div class="card">
       <div class="ability"><h3>🪓 Harry le Géant</h3>
-        <p>Qui a remporté un pli avec Harry ? Après le dernier pli, il peut changer son annonce de ±1.</p>
+        <p>Qui a gagné un pli avec Harry ? Il peut changer son annonce de ±1.</p>
         ${playerSelect(g, 'harryWho', h.pid || '')}
         ${h.pid ? seg('harryDelta', [[-1, '−1'], [0, 'Inchangée'], [1, '+1']], h.delta ?? 0) : ''}
         ${h.pid && round.bids[h.pid] != null ? `<p style="margin-top:8px">Annonce : ${round.bids[h.pid]} → <b>${R.effectiveBid(c, round, h.pid)}</b></p>` : ''}
       </div>
       <div class="ability"><h3>🎲 Rascal of Roatan</h3>
-        <p>Qui a remporté un pli avec Rascal ? Il parie 0, 10 ou 20 : gagnés si l’annonce est juste, perdus sinon.</p>
+        <p>Qui a gagné un pli avec Rascal ? Pari gagné si l’annonce est juste, perdu sinon.</p>
         ${playerSelect(g, 'rascalWho', r.pid || '')}
         ${r.pid ? seg('rascalBet', [[0, '0'], [10, '10'], [20, '20']], r.bet ?? 0) : ''}
       </div>
@@ -377,7 +371,7 @@ function viewLoot(g, round) {
   return `
     <div class="section-title">Butin</div>
     <div class="card">
-      <p class="small muted">Ajoutez chaque Butin joué dans un pli remporté par un autre joueur. Les deux alliés gagnent +20 s’ils réussissent tous deux leur annonce.</p>
+      <p class="hint" style="margin-top:0">+20 chacun si les deux alliés réussissent leur annonce.</p>
       ${rows}
       ${loots.length < 2 ? `<button class="btn" data-act="lootAdd" style="margin-top:10px">+ Ajouter une alliance</button>` : ''}
     </div>`;
@@ -427,7 +421,7 @@ function viewFreeBonus(g, round, scores) {
   }
   return `
     <div class="section-head"><div class="section-title">Bonus</div>${bonusModeSwitch(g)}</div>
-    ${rows.length ? `<p class="lede">Tapez les points de bonus de chaque joueur, ou utilisez − et + (par ${step}).${c.loot ? ' Le Butin se règle à part, plus haut.' : ''}</p>
+    ${rows.length ? `
       <div class="card free-list">${rows.join('')}</div>` : ''}
     ${noBonusNote(noTrick, missed)}`;
 }
@@ -461,7 +455,7 @@ function viewBonus(g, round, scores) {
       const n = counts[d.key] || 0;
       const why = R.bonusLimit(c, round, g.players, d, p.id);
       return `<div class="stepper-row"><span class="ico" aria-hidden="true">${d.icon}</span>
-        <span class="txt"><b>${d.label} <em class="${d.pts < 0 ? 'neg' : 'pos'}">${signed(d.pts * f)}</em></b><span>${d.hint}</span>${why ? `<span class="why">${esc(why)}</span>` : ''}</span>
+        <span class="txt"><b>${d.label} <em class="${d.pts < 0 ? 'neg' : 'pos'}">${signed(d.pts * f)}</em></b>${why ? `<span class="why">${esc(why)}</span>` : ''}</span>
         <span class="stepper">
           <button data-act="bonus" data-p="${p.id}" data-k="${d.key}" data-d="-1" ${n ? '' : 'disabled'} aria-label="Retirer : ${esc(d.label)}">−</button>
           <output>${n}</output>
@@ -479,7 +473,7 @@ function viewBonus(g, round, scores) {
   }
   return `
     <div class="section-head"><div class="section-title">Bonus</div>${bonusModeSwitch(g)}</div>
-    ${cards.length ? `<p class="lede">Touchez un joueur pour compter les cartes de ses plis qui rapportent un bonus.</p>${cards.join('')}` : ''}
+    ${cards.join('')}
     ${noBonusNote(noTrick, [])}`;
 }
 
@@ -526,7 +520,6 @@ function viewResults(g, round, editing) {
   return `
     <div class="section-head"><div class="section-title">Plis remportés</div>
       <button class="btn btn-small" data-act="fillTricks">Plis = annonces</button></div>
-    <p class="lede">Tout le monde part de 0, le point doré marque l’annonce. « Plis = annonces » remplit tout : il ne reste qu’à corriger les ratés.</p>
     ${tricks}
     ${viewAbilities(g, round)}
     ${viewLoot(g, round)}
@@ -647,7 +640,7 @@ function scoreTable(g, clickable) {
     <thead><tr><th>Manche</th>${head}</tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td>Total</td>${foot}</tr></tfoot></table></div>
-    <p class="tiny muted" style="padding:0 4px">Chaque case : total cumulé, puis ${g.players.length >= 6 ? '' : 'annonce / plis · '}points de la manche (vert : réussi, rouge : raté). Colonne dorée : en tête.${clickable ? ' Touchez une manche pour la corriger.' : ''}</p>`;
+    <p class="tiny muted" style="padding:0 4px">${g.players.length >= 6 ? 'Points' : 'Annonce / plis · points'} de la manche, total en gras.${clickable ? ' Touchez une manche pour la corriger.' : ''}</p>`;
 }
 
 function viewScores() {
@@ -890,7 +883,7 @@ const actions = {
     round.free[d.p] = cur + +d.d;
     commit();
   },
-  schedule: (d) => { ui.setup.config.schedule = d.v; render(); },
+  toggleRules: () => { ui.setup.showRules = !ui.setup.showRules; render(); },
   customAdd: () => { const c = ui.setup.config.custom; c.push(Math.min(20, (c.at(-1) || 0) + 1)); render(); },
   customDel: (d) => { const c = ui.setup.config.custom; if (c.length > 1) c.splice(+d.i, 1); render(); },
   customStep: (d) => { const c = ui.setup.config.custom; c[+d.i] = Math.max(1, Math.min(20, c[+d.i] + +d.d)); render(); },
@@ -904,7 +897,6 @@ const actions = {
     const { game, round } = ctx();
     for (const p of game.players) round.tricks[p.id] = R.effectiveBid(game.config, round, p.id) ?? 0;
     commit();
-    toast('Plis remplis avec les annonces');
   },
   bonus: (d) => {
     const { round } = ctx();
@@ -966,6 +958,7 @@ const actions = {
 };
 
 const changes = {
+  schedule: (v) => { ui.setup.config.schedule = v; render(); },
   harryWho: (v) => { const { round } = ctx(); round.harry = v ? { pid: v, delta: round.harry?.pid === v ? round.harry.delta : 0 } : null; commit(); },
   rascalWho: (v) => { const { round } = ctx(); round.rascal = v ? { pid: v, bet: round.rascal?.bet ?? 0 } : null; commit(); },
   lootFrom: (v, el) => { const { round } = ctx(); round.loots[+el.dataset.i].from = v; commit(); },

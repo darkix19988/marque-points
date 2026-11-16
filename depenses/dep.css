@@ -16,9 +16,6 @@ textarea.field { resize: vertical; font-family: inherit; }
 .faces .avatar { width: 24px; height: 24px; font-size: 11px; margin-right: -6px; box-shadow: 0 0 0 2px var(--surface); }
 .faces .more { margin-left: 12px; font-size: 12px; color: var(--ink-3); align-self: center; }
 
-.tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
-.tabs button { border: 0; background: none; min-height: 40px; border-radius: 999px; font-weight: 700; color: var(--ink-2); font-size: 15px; }
-.tabs button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .small-tabs button { min-height: 34px; font-size: 14px; }
 
 .list-card { padding: 2px 14px; }
@@ -45,7 +42,7 @@ textarea.field { resize: vertical; font-family: inherit; }
 
 .amount-box { display: flex; align-items: baseline; justify-content: center; gap: 6px; padding: 10px 0 2px; }
 .amount-input {
-  width: 100%; max-width: 260px; border: 0; border-bottom: 2px solid var(--line); background: transparent;
+  min-width: 1.4ch; max-width: 75%; border: 0; border-bottom: 2px solid var(--line); background: transparent;
   text-align: center; font-size: 44px; font-weight: 800; padding: 4px 0; font-variant-numeric: tabular-nums;
 }
 .amount-input:focus { outline: none; border-color: var(--accent); }

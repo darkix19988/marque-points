@@ -10,13 +10,13 @@
   <link rel="icon" href="assets/img/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/img/icon-192.png">
   <script src="assets/js/theme.js"></script>
-  <link rel="stylesheet" href="assets/css/base.css?v=6">
+  <link rel="stylesheet" href="assets/css/base.css?v=7">
   <style>
-    .hero { padding: 48px 0 28px; position: relative; }
+    .hero { padding: 36px 0 22px; position: relative; }
     .theme-btn { position: absolute; top: 16px; right: -6px; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 600; }
-    .hero .logo { font-size: 44px; line-height: 1; }
-    .hero h1 { font-size: 34px; margin-top: 14px; }
-    .hero p { margin-top: 8px; font-size: 17px; }
+    .hero .logo { font-size: 36px; line-height: 1; }
+    .hero h1 { font-size: 28px; margin-top: 10px; }
+    .hero p { margin-top: 6px; font-size: 16px; }
     .games { display: grid; gap: 14px; padding-bottom: 28px; }
     .group-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin: 0 4px 10px; }
     .game .art.money { background: #12301f; }
@@ -28,8 +28,8 @@
     }
     .game:active { transform: scale(.99); }
     .game .art {
-      width: 64px; height: 64px; flex: none; border-radius: 14px; display: grid; place-items: center;
-      font-size: 34px; background: #121a2a; color: #f2c14e;
+      width: 52px; height: 52px; flex: none; border-radius: 14px; display: grid; place-items: center;
+      font-size: 28px; background: #121a2a; color: #f2c14e;
     }
     .game h2 { font-size: 20px; }
     .game .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -47,7 +47,7 @@
       <button class="theme-btn" id="theme-btn" type="button"></button>
       <div class="logo" aria-hidden="true">🎲</div>
       <h1>Marque-points</h1>
-      <p class="muted">Des compteurs pour vos jeux et un outil pour partager les dépenses : vous saisissez, le site fait les calculs.</p>
+      <p class="muted">Vous saisissez, le site calcule.</p>
     </header>
 
     <h2 class="group-title">Jeux</h2>
@@ -56,14 +56,7 @@
         <div class="art" aria-hidden="true">☠️</div>
         <div>
           <h2>Skull King</h2>
-          <p class="muted small">Jeu de plis et de paris pirates, dès 2 joueurs et sans limite.</p>
-          <div class="tags">
-            <span class="tag">Règles officielles</span>
-            <span class="tag">Rascal</span>
-            <span class="tag">Kraken, Baleine, Butin</span>
-            <span class="tag">Expansion Pack</span>
-            <span class="tag">Ancienne édition</span>
-          </div>
+          <p class="muted small">Annonces, plis et bonus.</p>
           <span class="resume" id="sk-resume" hidden>Une partie est en cours, touchez pour reprendre</span>
         </div>
         <span class="go" aria-hidden="true">›</span>
@@ -76,7 +69,7 @@
         <div class="art money" aria-hidden="true">💸</div>
         <div>
           <h2>Dépenses</h2>
-          <p class="muted small">Qui a payé quoi, qui doit combien à qui. Idéal pour un week-end ou une coloc.</p>
+          <p class="muted small">Qui doit combien à qui.</p>
           <span class="resume" id="dep-info" hidden></span>
         </div>
         <span class="go" aria-hidden="true">›</span>
@@ -99,6 +92,6 @@
       if (n) { const el = document.getElementById('dep-info'); el.textContent = `${n} groupe${n > 1 ? 's' : ''} enregistré${n > 1 ? 's' : ''}`; el.hidden = false; }
     } catch (e) { /* stockage indisponible */ }
   </script>
-  <script src="assets/js/update.js" data-version="6" data-root="./" defer></script>
+  <script src="assets/js/update.js" data-version="7" data-root="./" defer></script>
 </body>
 </html>

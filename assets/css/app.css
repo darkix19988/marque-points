@@ -22,9 +22,9 @@ main.page.no-bar { padding-bottom: 40px; }
 .lede { font-size: 15px; color: var(--ink-2); padding: 0 4px; }
 
 /* Accueil */
-.sk-hero { text-align: center; padding: 28px 0 8px; }
-.sk-hero .skull { font-size: 64px; line-height: 1; }
-.sk-hero h1 { font-size: 32px; margin-top: 10px; }
+.sk-hero { text-align: center; padding: 18px 0 4px; }
+.sk-hero .skull { font-size: 44px; line-height: 1; }
+.sk-hero h1 { font-size: 24px; margin-top: 8px; }
 .sk-hero p { margin-top: 6px; }
 .resume-card { display: grid; gap: 12px; border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
 .resume-card .who { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -261,3 +261,19 @@ table.scores td .s.glancing { color: var(--warn); }
   font-variant-numeric: tabular-nums;
 }
 .free-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+
+/* Contrôle segmenté (choix exclusifs) */
+.tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
+.tabs button { border: 0; background: none; min-height: 38px; border-radius: 999px; font-weight: 700; color: var(--ink-2); font-size: 14px; padding: 0 8px; }
+.tabs button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+/* Préparation de partie */
+.field-label { font-size: 13px; font-weight: 700; color: var(--ink-2); margin: 0 2px 6px; }
+.hint { font-size: 13px; color: var(--ink-2); margin: 6px 2px 0; }
+.hint.warn { color: var(--warn); }
+.rules-summary { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font-size: 14px; color: var(--ink-2); line-height: 1.4; }
+.rules-summary .grow { flex: 1; min-width: 0; }
+.rules-summary .link { color: var(--accent); font-weight: 700; white-space: nowrap; }
+.rules-panel { gap: 18px; }
+.rules-panel .switch { padding: 8px 2px; }
+.rules-panel .switch .txt b { font-weight: 500; }

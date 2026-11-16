@@ -141,12 +141,12 @@ export function bonusDefs(c) {
     return [
       {
         key: 'pirates', icon: '💀', pts: 30, total: 6, exclusive: true,
-        label: 'Pirate capturé par le Skull King',
+        label: 'Pirate pris par le Skull King',
         hint: 'Dans le pli gagné par le Skull King. La Scary Mary compte toujours, même jouée en Escape.',
       },
       {
         key: 'sk', icon: '🧜‍♀️', pts: 50, total: 1, exclusive: true,
-        label: 'Skull King capturé par la Sirène',
+        label: 'Skull King pris par la Sirène',
         hint: 'Le Skull King dans le pli gagné par la Sirène.',
       },
     ];
@@ -161,23 +161,23 @@ export function bonusDefs(c) {
     },
     {
       key: 'b14', icon: '🏴', pts: 20, total: 1,
-      label: '14 noir (Jolly Roger)',
+      label: '14 noir',
       hint: 'Dans vos plis, peu importe qui l’a joué.',
     },
     {
       key: 'mermaid', icon: '🧜‍♀️', pts: 20, total: 2,
-      label: 'Sirène capturée par un Pirate',
+      label: 'Sirène prise par un Pirate',
       hint: 'Dans un pli gagné par un Pirate (ou la Tigresse jouée en Pirate).',
     },
     {
       key: 'pirates', icon: '☠️', pts: 30, total: piratesInDeck, exclusive: true,
-      label: 'Pirate capturé par le Skull King',
+      label: 'Pirate pris par le Skull King',
       hint: 'Dans le pli gagné par le Skull King. La Tigresse compte seulement si elle a été jouée en Pirate.'
         + (plank ? ' Un pirate retiré par La Planche ne compte pas.' : ''),
     },
     {
       key: 'sk', icon: '👑', pts: 40, total: 1, exclusive: true,
-      label: 'Skull King capturé par une Sirène',
+      label: 'Skull King pris par une Sirène',
       hint: 'Le Skull King dans le pli gagné par une Sirène.',
     },
   ];
@@ -185,7 +185,7 @@ export function bonusDefs(c) {
     if (c.packCon) {
       defs.push({
         key: 'con', icon: '🗡️', pts: 30, total: 1, exclusive: true,
-        label: 'First Mate Con capturé',
+        label: 'First Mate Con pris',
         hint: 'Par le Skull King ou une Sirène.',
       });
     }
@@ -205,7 +205,7 @@ export function bonusDefs(c) {
     if (c.packDavy && monsters > 0) {
       defs.push({
         key: 'davy', icon: '⚓', pts: 20, total: monsters, exclusive: true, noTrick: true,
-        label: 'Monstre marin pris par Davy Jones',
+        label: 'Monstre pris par Davy Jones',
         hint: 'Pour qui a joué le Coffre : chaque Kraken, Baleine ou Raie détruit. Possible sans gagner de pli.',
       });
     }
